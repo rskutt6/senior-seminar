@@ -1,0 +1,16 @@
+# dependencies
+node_modules
+
+# Next.js build output
+.next
+
+# Nest/TS build output
+dist
+
+# env files (real secrets / local config)
+.env
+.env.*
+!.env.example
+
+# macOS junk
+.DS_Store
