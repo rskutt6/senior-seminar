@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+
 
 type FormState = {
   firstName: string;
@@ -18,6 +20,9 @@ function isValidPassword(password: string) {
 }
 
 export default function CreateAccountPage() {
+
+  const router = useRouter();
+
   const [form, setForm] = useState<FormState>({
     firstName: '',
     lastName: '',
@@ -67,16 +72,25 @@ export default function CreateAccountPage() {
       });
 
       if (!res.ok) {
-        let msg = `Request failed (${res.status})`;
-        try {
-          const data = await res.json();
-          if (typeof data?.message === 'string') msg = data.message;
-          if (Array.isArray(data?.message)) msg = data.message.join(', ');
-        } catch {}
-        throw new Error(msg);
-      }
+  const data = await res.json().catch(() => null);
+
+  if (data?.message === 'Email already exists.') {
+    throw new Error('That email is already in use. Try logging in instead.');
+  }
+
+  throw new Error(
+    typeof data?.message === 'string'
+      ? data.message
+      : 'Failed to create account.',
+  );
+}
+
 
       setSuccess('Account created! 🎉');
+      setForm({ firstName: '', lastName: '', email: '', password: '' });
+
+      router.push('/dashboard');
+
       setForm({ firstName: '', lastName: '', email: '', password: '' });
     } catch (err: any) {
       setError(err?.message ?? 'Something went wrong.');

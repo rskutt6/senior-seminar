@@ -10,8 +10,11 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // If you want all routes to be /api/... uncomment this:
-  // app.setGlobalPrefix("api");
+  app.enableCors({
+    origin: ["http://localhost:3000"], // your Next dev server
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  });
 
   await app.listen(Number(process.env.PORT) || 4000);
 }
