@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import bcrypt from "bcrypt";
-import { pool } from "../db";
+import bcrypt from 'bcrypt';
+import { pool } from '../db';
 
 export type CreateUserDto = {
   firstName: string;
@@ -15,14 +15,14 @@ export class UsersService {
     const firstName = dto.firstName?.trim();
     const lastName = dto.lastName?.trim();
     const email = dto.email?.trim().toLowerCase();
-    const password = dto.password ?? "";
+    const password = dto.password ?? '';
 
     if (!firstName || !lastName || !email || !password) {
-      throw new Error("firstName, lastName, email, and password are required");
+      throw new Error('firstName, lastName, email, and password are required');
     }
 
     if (password.length < 8) {
-      throw new Error("Password must be at least 8 characters.");
+      throw new Error('Password must be at least 8 characters.');
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
