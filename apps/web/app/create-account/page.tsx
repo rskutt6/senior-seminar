@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-
 type FormState = {
   firstName: string;
   lastName: string;
@@ -20,7 +19,6 @@ function isValidPassword(password: string) {
 }
 
 export default function CreateAccountPage() {
-
   const router = useRouter();
 
   const [form, setForm] = useState<FormState>({
@@ -72,19 +70,20 @@ export default function CreateAccountPage() {
       });
 
       if (!res.ok) {
-  const data = await res.json().catch(() => null);
+        const data = await res.json().catch(() => null);
 
-  if (data?.message === 'Email already exists.') {
-    throw new Error('That email is already in use. Try logging in instead.');
-  }
+        if (data?.message === 'Email already exists.') {
+          throw new Error(
+            'That email is already in use. Try logging in instead.',
+          );
+        }
 
-  throw new Error(
-    typeof data?.message === 'string'
-      ? data.message
-      : 'Failed to create account.',
-  );
-}
-
+        throw new Error(
+          typeof data?.message === 'string'
+            ? data.message
+            : 'Failed to create account.',
+        );
+      }
 
       setSuccess('Account created! 🎉');
       setForm({ firstName: '', lastName: '', email: '', password: '' });
