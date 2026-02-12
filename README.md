@@ -20,9 +20,9 @@ Enure you have:
 
 3. Configure environment variables (not committed to GitHub)
    - cp apps/web/.env.example apps/web/.env.local --> (inside .env.local)
-   - NEXT_PUBLIC_API_BASE_URL=http://localhost:4000
+   - In text group chat
 4. Backend (NestJS)
-   - cp apps/api/.env.example apps/api/.env --> (inside .env) PORT=4000
+   - cp apps/api/.env.example apps/api/.env --> (inside .env) In text group chat
 5. Running frontend and backend toegther
    - npm run dev
    - Frontend: http://localhost:3000
