@@ -3,188 +3,214 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-type FormState = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  password: string;
-};
-
-function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-}
-
-function isValidPassword(password: string) {
-  return password.length >= 8;
-}
-
 export default function CreateAccountPage() {
   const router = useRouter();
 
-  const [form, setForm] = useState<FormState>({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-  });
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  const canSubmit =
-    form.firstName.trim() &&
-    form.lastName.trim() &&
-    isValidEmail(form.email) &&
-    isValidPassword(form.password);
-
-  async function handleSubmit(e: React.FormEvent) {
+  const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSuccess(null);
 
-    if (!canSubmit) {
-      setError(
-        'Please fill out all fields. Password must be at least 8 characters.',
-      );
+    // Require a real-ish email like name@example.com
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      alert('Please enter a valid email address (like name@example.com).');
       return;
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-    if (!baseUrl) {
-      setError('NEXT_PUBLIC_API_BASE_URL is not set.');
+    if (password.length < 6) {
+      alert('Password must be at least 6 characters.');
       return;
     }
 
-    setLoading(true);
-    try {
-      const res = await fetch(`${baseUrl}/users`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
-          email: form.email.trim().toLowerCase(),
-          password: form.password,
-        }),
-      });
+    const res = await fetch('http://localhost:4000/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstName, lastName, email, password }),
+    });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
+    const data = await res.json();
 
-        if (data?.message === 'Email already exists.') {
-          throw new Error(
-            'That email is already in use. Try logging in instead.',
-          );
-        }
-
-        throw new Error(
-          typeof data?.message === 'string'
-            ? data.message
-            : 'Failed to create account.',
-        );
-      }
-
-      setSuccess('Account created! 🎉');
-      setForm({ firstName: '', lastName: '', email: '', password: '' });
-
-      router.push('/dashboard');
-
-      setForm({ firstName: '', lastName: '', email: '', password: '' });
-    } catch (err: any) {
-      setError(err?.message ?? 'Something went wrong.');
-    } finally {
-      setLoading(false);
+    if (!res.ok) {
+      alert(data.message || 'Failed to create account');
+      return;
     }
-  }
+
+    // Log them in so dashboard doesn't redirect them back
+    localStorage.setItem('user', JSON.stringify(data));
+
+    // Go straight to dashboard
+    router.push('/dashboard');
+  };
 
   return (
-    <main style={{ maxWidth: 520, margin: '40px auto', padding: 16 }}>
-      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>
-        Create Account
-      </h1>
+    <main style={page}>
+      <div style={card}>
+        <div style={header}>
+          <h1 style={title}>Create account</h1>
+          <p style={subtitle}>
+            Use a real email — then you’ll go straight to your dashboard.
+          </p>
+        </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 14 }}>
-        <label style={labelStyle}>
-          <span>First name</span>
-          <input
-            value={form.firstName}
-            onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-            style={inputStyle}
-          />
-        </label>
+        <form onSubmit={handleCreateAccount} style={form}>
+          <div style={row}>
+            <div style={field}>
+              <label style={label}>First name</label>
+              <input
+                style={input}
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="First Name"
+                required
+              />
+            </div>
 
-        <label style={labelStyle}>
-          <span>Last name</span>
-          <input
-            value={form.lastName}
-            onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-            style={inputStyle}
-          />
-        </label>
-
-        <label style={labelStyle}>
-          <span>Email</span>
-          <input
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            inputMode="email"
-            style={inputStyle}
-          />
-        </label>
-
-        <label style={labelStyle}>
-          <span>Password</span>
-          <input
-            type="password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            style={inputStyle}
-          />
-          <span style={{ fontSize: 12, opacity: 0.7 }}>
-            Must be at least 8 characters
-          </span>
-        </label>
-
-        {error && (
-          <div style={{ background: '#ffecec', padding: 10, borderRadius: 10 }}>
-            <span style={{ color: 'crimson' }}>{error}</span>
+            <div style={field}>
+              <label style={label}>Last name</label>
+              <input
+                style={input}
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Last Name"
+                required
+              />
+            </div>
           </div>
-        )}
 
-        {success && (
-          <div style={{ background: '#eaffea', padding: 10, borderRadius: 10 }}>
-            <span>{success}</span>
+          <div style={field}>
+            <label style={label}>Email</label>
+            <input
+              style={input}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@example.com"
+              required
+            />
           </div>
-        )}
 
-        <button
-          type="submit"
-          disabled={!canSubmit || loading}
-          style={{
-            padding: '10px 14px',
-            borderRadius: 10,
-            border: '1px solid #ddd',
-            fontWeight: 600,
-            cursor: !canSubmit || loading ? 'not-allowed' : 'pointer',
-            opacity: !canSubmit || loading ? 0.6 : 1,
-          }}
-        >
-          {loading ? 'Creating...' : 'Create account'}
-        </button>
-      </form>
+          <div style={field}>
+            <label style={label}>Password</label>
+            <input
+              style={input}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+            <p style={hint}>Must be at least 6 characters.</p>
+          </div>
+
+          <button type="submit" style={primaryBtn}>
+            Create account
+          </button>
+
+          <button
+            type="button"
+            style={ghostBtn}
+            onClick={() => router.push('/login')}
+          >
+            Back to login
+          </button>
+        </form>
+      </div>
     </main>
   );
 }
 
-const labelStyle: React.CSSProperties = {
-  display: 'grid',
-  gap: 6,
+const page: React.CSSProperties = {
+  minHeight: '100vh',
+  background: '#0f172a',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontFamily: 'system-ui, sans-serif',
+  padding: '24px',
 };
 
-const inputStyle: React.CSSProperties = {
-  padding: '10px 12px',
-  borderRadius: 10,
-  border: '1px solid #ddd',
+const card: React.CSSProperties = {
+  width: '560px',
+  background: '#111827',
+  borderRadius: '20px',
+  padding: '40px',
+  color: '#f9fafb',
+  boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
+  border: '1px solid rgba(255,255,255,0.06)',
+};
+
+const header: React.CSSProperties = {
+  marginBottom: '22px',
+};
+
+const title: React.CSSProperties = {
+  fontSize: '28px',
+  fontWeight: 700,
+  margin: 0,
+};
+
+const subtitle: React.CSSProperties = {
+  color: '#9ca3af',
+  marginTop: '8px',
+  marginBottom: 0,
+  lineHeight: 1.4,
+};
+
+const form: React.CSSProperties = {
+  display: 'grid',
+  gap: '16px',
+};
+
+const row: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: '12px',
+};
+
+const field: React.CSSProperties = {
+  display: 'grid',
+  gap: '8px',
+};
+
+const label: React.CSSProperties = {
+  fontSize: '14px',
+  color: '#cbd5e1',
+};
+
+const input: React.CSSProperties = {
+  background: '#0b1220',
+  border: '1px solid #243042',
+  color: '#f9fafb',
+  padding: '12px 14px',
+  borderRadius: '12px',
   outline: 'none',
+};
+
+const hint: React.CSSProperties = {
+  fontSize: '12px',
+  color: '#94a3b8',
+  marginTop: '-2px',
+};
+
+const primaryBtn: React.CSSProperties = {
+  background: '#3b82f6',
+  color: 'white',
+  border: 'none',
+  padding: '12px 16px',
+  borderRadius: '12px',
+  cursor: 'pointer',
+  fontWeight: 700,
+};
+
+const ghostBtn: React.CSSProperties = {
+  background: 'transparent',
+  color: '#cbd5e1',
+  border: '1px solid rgba(255,255,255,0.12)',
+  padding: '12px 16px',
+  borderRadius: '12px',
+  cursor: 'pointer',
+  fontWeight: 600,
 };

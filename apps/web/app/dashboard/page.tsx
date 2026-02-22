@@ -1,4 +1,25 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+
 export default function Dashboard() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const user = localStorage.getItem('user');
+
+    // If no user is logged in, send back to create account page
+    if (!user) {
+      router.push('/');
+    }
+  }, [router]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    router.push('/');
+  };
+
   return (
     <main style={page}>
       <div style={card}>
@@ -25,7 +46,9 @@ export default function Dashboard() {
             <h2 style={panelTitle}>Quick actions</h2>
             <div style={buttonRow}>
               <button style={primaryBtn}>Go to Profile</button>
-              <button style={secondaryBtn}>Log out</button>
+              <button style={secondaryBtn} onClick={handleLogout}>
+                Log out
+              </button>
             </div>
             <p style={hint}>
               (Buttons are just UI for now — we can wire them up next.)
@@ -39,108 +62,94 @@ export default function Dashboard() {
 
 const page: React.CSSProperties = {
   minHeight: '100vh',
-  padding: '60px 16px',
+  background: '#0f172a',
   display: 'flex',
+  alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: '#0f172a', // solid dark base
+  fontFamily: 'system-ui, sans-serif',
+  padding: '24px',
 };
 
-
 const card: React.CSSProperties = {
-  width: '100%',
-  maxWidth: 900,
-  borderRadius: 20,
-  padding: 28,
-  backgroundColor: '#ffffff',
-  boxShadow: '0 20px 60px rgba(0, 0, 0, 0.35)',
-  color: '#0f172a',
+  background: '#111827',
+  padding: '40px',
+  borderRadius: '20px',
+  width: '600px',
+  color: '#f9fafb',
+  boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
 };
 
 const headerRow: React.CSSProperties = {
   display: 'flex',
-  alignItems: 'flex-start',
   justifyContent: 'space-between',
-  gap: 16,
-  marginBottom: 18,
+  alignItems: 'center',
+  marginBottom: '30px',
 };
 
 const title: React.CSSProperties = {
-  fontSize: 28,
-  fontWeight: 800,
-  margin: 0,
-  letterSpacing: -0.3,
-  color: '#0f172a',
+  fontSize: '28px',
+  fontWeight: 700,
 };
 
 const subtitle: React.CSSProperties = {
-  margin: '8px 0 0',
-  color: '#334155',
+  color: '#9ca3af',
 };
 
-
 const pill: React.CSSProperties = {
-  padding: '8px 10px',
-  borderRadius: 999,
-  fontSize: 12,
-  fontWeight: 700,
-  border: '1px solid rgba(0,0,0,0.1)',
-  background: 'rgba(16,185,129,0.12)',
+  background: '#22c55e',
+  color: 'white',
+  padding: '6px 14px',
+  borderRadius: '999px',
+  fontSize: '14px',
 };
 
 const grid: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-  gap: 14,
+  gap: '20px',
 };
 
 const panel: React.CSSProperties = {
-  borderRadius: 16,
-  border: '1px solid rgba(0,0,0,0.08)',
-  padding: 16,
-  background: 'white',
+  background: '#1f2937',
+  padding: '20px',
+  borderRadius: '14px',
 };
 
 const panelTitle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 16,
-  fontWeight: 800,
+  marginBottom: '10px',
+  fontSize: '18px',
 };
 
 const list: React.CSSProperties = {
-  margin: '10px 0 0',
-  paddingLeft: 18,
-  lineHeight: 1.8,
+  paddingLeft: '18px',
 };
 
 const buttonRow: React.CSSProperties = {
   display: 'flex',
-  gap: 10,
-  marginTop: 10,
-  flexWrap: 'wrap',
+  gap: '10px',
+  marginBottom: '10px',
 };
 
 const primaryBtn: React.CSSProperties = {
-  padding: '10px 14px',
-  borderRadius: 12,
-  border: '1px solid rgba(0,0,0,0.12)',
-  background: 'black',
+  background: '#3b82f6',
   color: 'white',
-  fontWeight: 700,
+  border: 'none',
+  padding: '10px 16px',
+  borderRadius: '10px',
   cursor: 'pointer',
+  fontWeight: 600,
 };
 
 const secondaryBtn: React.CSSProperties = {
-  padding: '10px 14px',
-  borderRadius: 12,
-  border: '1px solid rgba(0,0,0,0.12)',
-  background: 'white',
-  color: 'black',
-  fontWeight: 700,
+  background: '#ef4444',
+  color: 'white',
+  border: 'none',
+  padding: '10px 16px',
+  borderRadius: '10px',
   cursor: 'pointer',
+  fontWeight: 600,
 };
 
 const hint: React.CSSProperties = {
-  margin: '10px 0 0',
-  fontSize: 12,
-  color: '#64748b',
+  fontSize: '12px',
+  color: '#9ca3af',
 };

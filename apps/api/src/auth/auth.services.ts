@@ -1,21 +1,70 @@
-import { Injectable } from "@nestjs/common";
+import {
+  Injectable,
+  BadRequestException,
+  InternalServerErrorException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import { pool } from "../db";
 
+type LoginDto = {
+  email: string;
+  password: string;
+};
+
 @Injectable()
 export class AuthService {
-  async validateUser(email: string, password: string) {
-    const result = await pool.query(
-      "SELECT id, email, password_hash FROM users WHERE email = $1",
-      [email]
-    );
+  async login(dto: LoginDto) {
+    const { email, password } = dto;
 
-    const user = result.rows[0];
-    if (!user) return null;
+    if (!email || !password) {
+      throw new BadRequestException("Email and password are required");
+    }
 
-    const valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) return null;
+    const normalizedEmail = email.trim().toLowerCase();
 
-    return user;
+    try {
+      // IMPORTANT: password hash is stored in column "password"
+      const result = await pool.query(
+        `
+        SELECT id, first_name, last_name, email, password
+        FROM public.users
+        WHERE email = $1
+        LIMIT 1
+        `,
+        [normalizedEmail]
+      );
+
+      const user = result.rows[0];
+
+      if (!user) {
+        throw new UnauthorizedException("Invalid email or password");
+      }
+
+      const ok = await bcrypt.compare(password, user.password);
+
+      if (!ok) {
+        throw new UnauthorizedException("Invalid email or password");
+      }
+
+      // Return safe user info (no password)
+      return {
+        id: user.id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email,
+      };
+    } catch (err: any) {
+      // If we intentionally threw 400/401, rethrow as-is
+      if (
+        err instanceof BadRequestException ||
+        err instanceof UnauthorizedException
+      ) {
+        throw err;
+      }
+
+      console.error("Auth login error:", err);
+      throw new InternalServerErrorException("Login failed");
+    }
   }
 }
