@@ -2,14 +2,16 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import WeekGrid from './_components/WeekGrid';
 
-export default function Dashboard() {
+export default function DashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
     const user = localStorage.getItem('user');
 
-    // If no user is logged in, send back to create account page
+    // If no user is logged in, send back to your entry route
+    // (Change '/' to '/login' if that's your real login route)
     if (!user) {
       router.push('/');
     }
@@ -20,41 +22,39 @@ export default function Dashboard() {
     router.push('/');
   };
 
+  const week = {
+    label: 'Week of Feb 16',
+    days: [
+      { name: 'Monday', items: ['Task 1', 'Task 2', 'Task 3'] },
+      { name: 'Tuesday', items: ['Task 1', 'Task 2'] },
+      { name: 'Wednesday', items: ['Task 1'] },
+      { name: 'Thursday', items: ['Task 1', 'Task 2', 'Task 3'] },
+      { name: 'Friday', items: ['Task 1', 'Task 2'] },
+      { name: 'Saturday', items: ['Task 1'] },
+      { name: 'Sunday', items: ['Task 1', 'Task 2', 'Task 3'] },
+    ],
+  };
+
   return (
     <main style={page}>
       <div style={card}>
         <div style={headerRow}>
           <div>
-            <h1 style={title}>Welcome to your dashboard</h1>
-            <p style={subtitle}>Your account was successfully created.</p>
+            <h1 style={title}>Dashboard</h1>
+            <p style={subtitle}>{week.label}</p>
           </div>
 
-          <div style={pill}>Signed in</div>
+          <div style={rightHeader}>
+            <div style={pill}>Signed in</div>
+            <button style={secondaryBtn} onClick={handleLogout}>
+              Log out
+            </button>
+          </div>
         </div>
 
-        <div style={grid}>
-          <section style={panel}>
-            <h2 style={panelTitle}>Next steps</h2>
-            <ul style={list}>
-              <li>✅ Explore your features</li>
-              <li>✅ Update your profile</li>
-              <li>✅ Start using the app</li>
-            </ul>
-          </section>
-
-          <section style={panel}>
-            <h2 style={panelTitle}>Quick actions</h2>
-            <div style={buttonRow}>
-              <button style={primaryBtn}>Go to Profile</button>
-              <button style={secondaryBtn} onClick={handleLogout}>
-                Log out
-              </button>
-            </div>
-            <p style={hint}>
-              (Buttons are just UI for now — we can wire them up next.)
-            </p>
-          </section>
-        </div>
+        <section style={panel}>
+          <WeekGrid days={week.days} />
+        </section>
       </div>
     </main>
   );
@@ -62,94 +62,61 @@ export default function Dashboard() {
 
 const page: React.CSSProperties = {
   minHeight: '100vh',
-  background: '#0f172a',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontFamily: 'system-ui, sans-serif',
   padding: '24px',
 };
 
 const card: React.CSSProperties = {
-  background: '#111827',
-  padding: '40px',
-  borderRadius: '20px',
-  width: '600px',
-  color: '#f9fafb',
-  boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
+  maxWidth: 1100,
+  margin: '0 auto',
 };
 
 const headerRow: React.CSSProperties = {
   display: 'flex',
+  alignItems: 'flex-start',
   justifyContent: 'space-between',
+  gap: 16,
+  marginBottom: 16,
+};
+
+const rightHeader: React.CSSProperties = {
+  display: 'flex',
   alignItems: 'center',
-  marginBottom: '30px',
+  gap: 10,
 };
 
 const title: React.CSSProperties = {
-  fontSize: '28px',
-  fontWeight: 700,
+  fontSize: 32,
+  fontWeight: 900,
+  margin: 0,
 };
 
 const subtitle: React.CSSProperties = {
-  color: '#9ca3af',
+  margin: '6px 0 0',
+  opacity: 0.8,
 };
 
 const pill: React.CSSProperties = {
-  background: '#22c55e',
-  color: 'white',
-  padding: '6px 14px',
-  borderRadius: '999px',
-  fontSize: '14px',
-};
-
-const grid: React.CSSProperties = {
-  display: 'grid',
-  gap: '20px',
+  padding: '8px 10px',
+  borderRadius: 999,
+  fontSize: 12,
+  fontWeight: 700,
+  border: '1px solid rgba(0,0,0,0.12)',
+  background: 'rgba(16,185,129,0.12)',
 };
 
 const panel: React.CSSProperties = {
-  background: '#1f2937',
-  padding: '20px',
-  borderRadius: '14px',
-};
-
-const panelTitle: React.CSSProperties = {
-  marginBottom: '10px',
-  fontSize: '18px',
-};
-
-const list: React.CSSProperties = {
-  paddingLeft: '18px',
-};
-
-const buttonRow: React.CSSProperties = {
-  display: 'flex',
-  gap: '10px',
-  marginBottom: '10px',
-};
-
-const primaryBtn: React.CSSProperties = {
-  background: '#3b82f6',
-  color: 'white',
-  border: 'none',
-  padding: '10px 16px',
-  borderRadius: '10px',
-  cursor: 'pointer',
-  fontWeight: 600,
+  borderRadius: 16,
+  border: '1px solid rgba(0,0,0,0.08)',
+  padding: 16,
+  background: 'white',
 };
 
 const secondaryBtn: React.CSSProperties = {
-  background: '#ef4444',
-  color: 'white',
-  border: 'none',
-  padding: '10px 16px',
-  borderRadius: '10px',
+  padding: '10px 14px',
+  borderRadius: 12,
+  border: '1px solid rgba(0,0,0,0.12)',
+  background: 'white',
+  color: 'black',
+  fontWeight: 700,
   cursor: 'pointer',
-  fontWeight: 600,
-};
-
-const hint: React.CSSProperties = {
-  fontSize: '12px',
-  color: '#9ca3af',
 };
