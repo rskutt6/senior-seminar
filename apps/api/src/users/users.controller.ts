@@ -1,20 +1,22 @@
-import { Body, Controller, Post, BadRequestException } from '@nestjs/common';
-import { UsersService } from './users.service';
-import type { CreateUserDto } from './users.service';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import * as usersService_1 from './users.service';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: usersService_1.UsersService) {}
 
   @Post()
-  async create(@Body() body: CreateUserDto) {
-    try {
-      return await this.usersService.create(body);
-    } catch (e: any) {
-      if (e?.code === '23505') {
-        throw new BadRequestException('Email already exists.');
-      }
-      throw new BadRequestException(e?.message ?? 'Could not create user.');
-    }
+  create(@Body() dto: usersService_1.CreateUserDto) {
+    return this.usersService.create(dto);
+  }
+
+  @Get()
+  findAll() {
+    return this.usersService.findAll();
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.usersService.findOne(Number(id));
   }
 }
