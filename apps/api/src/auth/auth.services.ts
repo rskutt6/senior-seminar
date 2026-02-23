@@ -27,21 +27,26 @@ export class AuthService {
       // IMPORTANT: password hash is stored in column "password"
       const result = await pool.query(
         `
-        SELECT id, first_name, last_name, email, password
-        FROM public.users
+        SELECT id, "firstName", "lastName", email, "passwordHash"
+        FROM public."User"
         WHERE email = $1
-        LIMIT 1
+        LIMIT 1;
         `,
-        [normalizedEmail]
+        [normalizedEmail],
       );
 
       const user = result.rows[0];
+      if (!user) throw new UnauthorizedException('Invalid credentials');
 
-      if (!user) {
-        throw new UnauthorizedException("Invalid email or password");
+      if (!password) throw new BadRequestException('Missing password');
+      if (!user.passwordHash) {
+        // This is the key debug line
+        throw new Error(
+          'User record missing passwordHash (check SELECT "passwordHash")',
+        );
       }
 
-      const ok = await bcrypt.compare(password, user.password);
+      const ok = await bcrypt.compare(password, user.passwordHash);
 
       if (!ok) {
         throw new UnauthorizedException("Invalid email or password");
