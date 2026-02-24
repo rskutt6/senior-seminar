@@ -25,9 +25,9 @@ export default function InputAssignmentSuccessPage() {
   const [error, setError] = useState("");
 
   const prettyDue = useMemo(() => {
-    if (!assignment?.dueAt) return "";
+    if (!assignment?.dueAt) return 'No due date';
     const d = new Date(assignment.dueAt);
-    return d.toLocaleString();
+    return isNaN(d.getTime()) ? 'No due date' : d.toLocaleString();
   }, [assignment?.dueAt]);
 
   useEffect(() => {
@@ -72,8 +72,12 @@ export default function InputAssignmentSuccessPage() {
               <div style={styles.block}>
                 <div style={styles.label}>Class</div>
                 <div style={styles.value}>
-                  {assignment.courseCode ?? `Course #${assignment.courseId}`}
-                  {assignment.courseName ? ` — ${assignment.courseName}` : ""}
+                  {assignment.courseCode
+                    ? assignment.courseCode
+                    : assignment.courseId
+                      ? `Course #${assignment.courseId}`
+                      : 'No course selected'}
+                  {assignment.courseName ? ` — ${assignment.courseName}` : ''}
                 </div>
               </div>
 
@@ -84,10 +88,14 @@ export default function InputAssignmentSuccessPage() {
 
               <div style={styles.block}>
                 <div style={styles.label}>Weight</div>
-                <div style={styles.value}>{assignment.weight}%</div>
+                <div style={styles.value}>
+                  {assignment.weight === null || assignment.weight === undefined
+                    ? 'Not set'
+                    : `${assignment.weight}%`}
+                </div>
               </div>
 
-              <div style={{ ...styles.block, gridColumn: "1 / -1" }}>
+              <div style={{ ...styles.block, gridColumn: '1 / -1' }}>
                 <div style={styles.label}>Details</div>
                 <div style={styles.valueBox}>{assignment.description}</div>
               </div>
@@ -96,11 +104,13 @@ export default function InputAssignmentSuccessPage() {
 
           <div style={styles.actions}>
             <button
-  style={styles.secondaryBtn}
-  onClick={() => router.push(`/dashboard/input-assignments?userId=${userId}`)}
->
-  Add another
-</button>
+              style={styles.secondaryBtn}
+              onClick={() =>
+                router.push(`/dashboard/input-assignments?userId=${userId}`)
+              }
+            >
+              Add another
+            </button>
           </div>
         </div>
       </div>
