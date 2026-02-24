@@ -28,11 +28,11 @@ export class UsersService {
     try {
       const result = await pool.query(
         `
-        INSERT INTO public.users (first_name, last_name, email, password)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id, first_name, last_name, email, created_at
+        INSERT INTO public."User" ("firstName", "lastName", email, "passwordHash")
+VALUES ($1, $2, $3, $4)
+RETURNING id, "firstName", "lastName", email, "createdAt";
         `,
-        [firstName.trim(), lastName.trim(), normalizedEmail, passwordHash]
+        [firstName.trim(), lastName.trim(), normalizedEmail, passwordHash],
       );
 
       return result.rows[0];
@@ -52,7 +52,7 @@ export class UsersService {
       const result = await pool.query(
         `
         SELECT id, first_name, last_name, email, created_at
-        FROM public.users
+        FROM public."User"
         ORDER BY id DESC
         `
       );
@@ -73,7 +73,7 @@ export class UsersService {
       const result = await pool.query(
         `
         SELECT id, first_name, last_name, email, created_at
-        FROM public.users
+        FROM public."User"
         WHERE id = $1
         `,
         [id]

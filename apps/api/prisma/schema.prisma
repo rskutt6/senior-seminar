@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/* your models below... */
+model User {
+  id           Int          @id @default(autoincrement())
+  email        String       @unique
+  firstName    String
+  lastName     String
+  passwordHash String
+  createdAt    DateTime     @default(now())
+
+  courses      Course[]
+  assignments  Assignment[]
+}
+
+model Course {
+  id        Int      @id @default(autoincrement())
+  name      String
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  assignments Assignment[]
+
+  @@unique([userId, name])
+}
+
+model Assignment {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  courseId    Int?
+  course      Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
+
+  description String
+  weight      Float?
+  dueAt       DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
