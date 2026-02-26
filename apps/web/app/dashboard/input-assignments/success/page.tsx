@@ -23,6 +23,7 @@ export default function InputAssignmentSuccessPage() {
 
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [error, setError] = useState("");
+  const [courseLabel, setCourseLabel] = useState<string>("");
 
   const prettyDue = useMemo(() => {
     if (!assignment?.dueAt) return 'No due date';
@@ -59,6 +60,30 @@ export default function InputAssignmentSuccessPage() {
     load();
   }, [id, userId]);
 
+  useEffect(() => {
+    async function loadCourseLabel() {
+      if (!assignment?.courseId || !assignment?.userId) return;
+
+      try {
+        const res = await fetch(
+          `http://localhost:4000/courses?userId=${assignment.userId}`,
+          { cache: 'no-store' },
+        );
+
+        if (!res.ok) return;
+
+        const courses = await res.json();
+        const course = courses.find((c: any) => c.id === assignment.courseId);
+
+        setCourseLabel(course?.name ?? `Course #${assignment.courseId}`);
+      } catch {
+        // ignore; fallback below will handle it
+      }
+    }
+
+    loadCourseLabel();
+  }, [assignment?.courseId, assignment?.userId]);
+
   return (
     <main style={styles.page}>
       <div style={styles.shell}>
@@ -72,12 +97,9 @@ export default function InputAssignmentSuccessPage() {
               <div style={styles.block}>
                 <div style={styles.label}>Class</div>
                 <div style={styles.value}>
-                  {assignment.courseCode
-                    ? assignment.courseCode
-                    : assignment.courseId
-                      ? `Course #${assignment.courseId}`
-                      : 'No course selected'}
-                  {assignment.courseName ? ` — ${assignment.courseName}` : ''}
+                  {assignment.courseId
+                    ? courseLabel || `Course #${assignment.courseId}`
+                    : 'No course selected'}
                 </div>
               </div>
 

@@ -22,8 +22,7 @@ type CreatedAssignment = {
 export default function InputAssignmentsPage() {
   const router = useRouter();
 
-  // TODO: replace with real logged-in user id later
-  const userId = 1;
+  const [userId, setUserId] = useState<number | null>(null);
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
@@ -65,12 +64,32 @@ export default function InputAssignmentsPage() {
   }
 
   useEffect(() => {
-    loadCourses();
+    const storedUser = localStorage.getItem('user');
+
+    if (!storedUser) {
+      router.push('/login');
+      return;
+    }
+
+    const parsedUser = JSON.parse(storedUser);
+    setUserId(parsedUser.id);
+  }, [router]);
+
+  useEffect(() => {
+    if (userId) {
+      loadCourses();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userId]);
 
   async function handleAddCourse() {
     setError("");
+
+    if (!userId) {
+      setError('Not logged in. Please log in again.');
+      router.push('/login');
+      return;
+    }
 
     const name = newCourseName.trim();
     if (!name) {
@@ -106,6 +125,12 @@ export default function InputAssignmentsPage() {
   async function handleSubmit(e: React.FormEvent) {
   e.preventDefault();
   if (!canSubmit) return;
+
+  if (!userId) {
+    setError('Not logged in. Please log in again.');
+    router.push('/login');
+    return;
+  }
 
   setSubmitting(true);
   setError("");
