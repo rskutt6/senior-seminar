@@ -18,7 +18,7 @@ export default function LoginPage() {
       body: JSON.stringify({ email, password }),
     });
 
-    const data = await res.json();
+    const data = await res.json()
 
     if (!res.ok) {
       alert(data.message || "Login failed");
