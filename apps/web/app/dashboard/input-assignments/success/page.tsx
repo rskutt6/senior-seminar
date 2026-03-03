@@ -24,6 +24,8 @@ export default function InputAssignmentSuccessPage() {
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [error, setError] = useState("");
   const [courseLabel, setCourseLabel] = useState<string>("");
+  const [summary, setSummary] = useState<string>('');
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   const prettyDue = useMemo(() => {
     if (!assignment?.dueAt) return 'No due date';
@@ -59,6 +61,33 @@ export default function InputAssignmentSuccessPage() {
 
     load();
   }, [id, userId]);
+
+  useEffect(() => {
+    async function summarize() {
+      if (!assignment?.description) return;
+
+      setSummaryLoading(true);
+      try {
+        const res = await fetch('/api/summarize-assignment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description: assignment.description }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || 'Failed to summarize');
+
+        setSummary(data.summary || '');
+      } catch {
+        setSummary(''); // or keep an error state if you want
+      } finally {
+        setSummaryLoading(false);
+      }
+    }
+
+    summarize();
+  }, [assignment?.description]);
+
 
   useEffect(() => {
     async function loadCourseLabel() {
@@ -121,6 +150,13 @@ export default function InputAssignmentSuccessPage() {
                 <div style={styles.label}>Details</div>
                 <div style={styles.valueBox}>{assignment.description}</div>
               </div>
+
+              <div style={styles.block}>
+  <div style={styles.label}>AI summary</div>
+  <div style={styles.value}>
+    {summaryLoading ? "Summarizing…" : summary || "No summary"}
+  </div>
+</div>
             </div>
           )}
 
