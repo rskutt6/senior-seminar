@@ -7,31 +7,60 @@ export class AssignmentsService {
   constructor(@Inject('PG_POOL') private readonly pool: Pool) {}
 
   async create(dto: CreateAssignmentDto) {
-    if (!dto.description?.trim())
-      throw new BadRequestException('description required');
+    const title = typeof dto.title === 'string' ? dto.title.trim() : '';
+    const description =
+      typeof dto.description === 'string' ? dto.description.trim() : '';
 
-    if (!dto.userId) throw new BadRequestException('userId required');
+    if (!title) {
+      throw new BadRequestException('title required');
+    }
+
+    if (!description) {
+      throw new BadRequestException('description required');
+    }
+
+    if (!dto.userId) {
+      throw new BadRequestException('userId required');
+    }
 
     const query = `
-      INSERT INTO public."Assignment"
-        (description, weight, "dueAt", "userId", "courseId", "createdAt", "updatedAt")
-      VALUES
-        ($1, $2, $3, $4, $5, NOW(), NOW())
-      RETURNING
-        id,
-        description,
-        weight,
-        "dueAt",
-        "userId",
-        "courseId";
-    `;
+    INSERT INTO public."Assignment" (
+      title,
+      description,
+      weight,
+      "dueAt",
+      "userId",
+      "courseId",
+      "createdAt",
+      "updatedAt"
+    )
+    VALUES (
+      $1,
+      $2,
+      $3,
+      $4,
+      $5,
+      $6,
+      NOW(),
+      NOW()
+    )
+    RETURNING
+      id,
+      title,
+      description,
+      weight,
+      "dueAt",
+      "userId",
+      "courseId";
+  `;
 
     const values = [
-      dto.description,
+      title,
+      description,
       dto.weight ?? null,
       dto.dueAt ? new Date(dto.dueAt) : null,
       dto.userId,
-      dto.courseId ?? null, // 👈 allow null
+      dto.courseId ?? null,
     ];
 
     const { rows } = await this.pool.query(query, values);
@@ -43,6 +72,7 @@ export class AssignmentsService {
       `
       SELECT
         id,
+        title,
         description,
         weight,
         "dueAt",
@@ -63,6 +93,7 @@ export class AssignmentsService {
       `
       SELECT
         id,
+        title,
         description,
         weight,
         "dueAt",
