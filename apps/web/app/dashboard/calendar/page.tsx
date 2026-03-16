@@ -19,6 +19,7 @@ export default function CalendarPage() {
   const [assignments, setAssignments] = useState<ApiAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -50,6 +51,32 @@ export default function CalendarPage() {
     [assignments]
   );
 
+  // handles deleting assignments
+  async function handleDeleteAssignment(id: number) {
+  setError('');
+  setDeletingId(id);
+
+  // optimistic UI
+  const prev = assignments;
+  setAssignments((cur) => cur.filter((a) => a.id !== id));
+
+  try {
+    const res = await fetch(
+      `http://localhost:4000/assignments/${id}?userId=${userId}`,
+      { method: 'DELETE' }
+    );
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || 'Failed to delete assignment');
+  } catch (e: any) {
+    // rollback if it failed
+    setAssignments(prev);
+    setError(e.message || 'Failed to delete assignment');
+  } finally {
+    setDeletingId(null);
+  }
+}
+
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto' }}>
       <h1 style={{ margin: 0, fontSize: 28, fontWeight: 900 }}>Calendar</h1>
@@ -61,7 +88,11 @@ export default function CalendarPage() {
       {error && <p style={{ color: 'crimson' }}>{error}</p>}
 
       {!loading && !error && (
-        <MonthCalendar assignments={dueAssignments} />
+        <MonthCalendar 
+          assignments={dueAssignments}
+          onDelete={handleDeleteAssignment}
+          deletingId={deletingId}
+        />
       )}
     </main>
   );
