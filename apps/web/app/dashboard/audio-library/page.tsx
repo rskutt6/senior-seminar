@@ -1,3 +1,5 @@
 export default function AudioLibraryPage() {
-  return <main><h1>Audio Library</h1></main>;
+  return <div className="text-4xl font-bold text-blue-500">
+  Tailwind working
+</div>;
 }
