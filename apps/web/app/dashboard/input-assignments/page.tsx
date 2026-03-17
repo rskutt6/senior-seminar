@@ -28,26 +28,28 @@ export default function InputAssignmentsPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
 
-  const [selectedCourseId, setSelectedCourseId] = useState("");
-  const [weight, setWeight] = useState("");
+  const [selectedCourseId, setSelectedCourseId] = useState<string>("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [weight, setWeight] = useState<string>("");
   const [dueAtLocal, setDueAtLocal] = useState("");
 
   const [showAddCourse, setShowAddCourse] = useState(false);
   const [newCourseName, setNewCourseName] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string>("");
 
   const canSubmit = useMemo(() => {
-    return !submitting;
-  }, [submitting]);
+    return title.trim().length > 0 && description.trim().length > 0 && !submitting;
+  }, [title, description, submitting]);
 
-  async function loadCourses(currentUserId: number) {
+  async function loadCourses() {
     setLoadingCourses(true);
     setError("");
 
     try {
-      const res = await fetch(`http://localhost:4000/courses?userId=${currentUserId}`, {
+      const res = await fetch(`http://localhost:4000/courses?userId=${userId}`, {
         cache: "no-store",
       });
 
@@ -79,7 +81,7 @@ export default function InputAssignmentsPage() {
 
   useEffect(() => {
     if (userId) {
-      loadCourses(userId);
+      loadCourses();
     }
   }, [userId]);
 
@@ -87,8 +89,8 @@ export default function InputAssignmentsPage() {
     setError("");
 
     if (!userId) {
-      setError("Not logged in. Please log in again.");
-      router.push("/login");
+      setError('Not logged in. Please log in again.');
+      router.push('/login');
       return;
     }
 
@@ -116,30 +118,20 @@ export default function InputAssignmentsPage() {
       setNewCourseName("");
       setShowAddCourse(false);
 
-      await loadCourses(userId);
+      await loadCourses();
       setSelectedCourseId(String(created.id));
     } catch (e: any) {
       setError(e.message || "Failed to create course");
     }
   }
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
-    if (submitting) return;
+    if (!canSubmit) return;
 
     if (!userId) {
-      setError("Not logged in. Please log in again.");
-      router.push("/login");
-      return;
-    }
-
-    const formData = new FormData(e.currentTarget);
-    const title = String(formData.get("title") ?? "").trim();
-    const description = String(formData.get("description") ?? "").trim();
-
-    if (!title || !description) {
-      setError("Please enter both a title and assignment details.");
+      setError('Not logged in. Please log in again.');
+      router.push('/login');
       return;
     }
 
@@ -148,8 +140,8 @@ export default function InputAssignmentsPage() {
 
     try {
       const body: any = {
-        title,
-        description,
+        title: title.trim(),
+        description: description.trim(),
         userId,
       };
 
@@ -282,25 +274,20 @@ export default function InputAssignmentsPage() {
             )}
 
             <div style={styles.row}>
-              <label htmlFor="assignment-title" style={styles.label}>
-                Assignment title
-              </label>
+              <label style={styles.label}>Assignment title</label>
               <input
-                id="assignment-title"
-                name="title"
-                type="text"
-                placeholder="e.g., Social Media Lit Review Paper"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Paper 1"
                 style={styles.input}
               />
             </div>
 
             <div style={styles.row}>
-              <label htmlFor="assignment-description" style={styles.label}>
-                Assignment details
-              </label>
+              <label style={styles.label}>Assignment details</label>
               <textarea
-                id="assignment-description"
-                name="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 placeholder="Put the assignment name + any notes…"
                 style={styles.textarea}
                 rows={8}
@@ -349,107 +336,156 @@ export default function InputAssignmentsPage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    padding: "48px 20px",
-    display: "flex",
-    justifyContent: "center",
-  },
-  shell: { width: "100%", maxWidth: 860 },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginBottom: 16,
-  },
-  title: { margin: 0, fontSize: 34, letterSpacing: -0.5 },
-  subTitle: { margin: "6px 0 0", opacity: 0.75 },
-  card: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 18,
-    padding: 18,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
-  },
-  form: { display: "flex", flexDirection: "column", gap: 16 },
-  row: { display: "flex", flexDirection: "column", gap: 8 },
-  label: { fontSize: 14, opacity: 0.85 },
-  smallLabel: { fontSize: 12, opacity: 0.8 },
-  inline: { display: "flex", gap: 10, alignItems: "center" },
-  split: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 },
-  input: {
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.14)",
-    background: "rgba(255,255,255,0.06)",
-    outline: "none",
-  },
-  select: {
-    flex: 1,
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.14)",
-    background: "rgba(255,255,255,0.06)",
-    outline: "none",
-  },
-  textarea: {
-    padding: "14px 12px",
-    borderRadius: 14,
-    border: "1px solid rgba(255,255,255,0.14)",
-    background: "rgba(255,255,255,0.06)",
-    outline: "none",
-    resize: "vertical",
-    fontSize: 15,
-    lineHeight: 1.45,
-  },
-  actions: { display: "flex", justifyContent: "flex-end", marginTop: 4 },
-  primaryBtn: {
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.18)",
-    background: "rgba(255,255,255,0.12)",
-    cursor: "pointer",
-    fontWeight: 600,
-  },
-  secondaryBtn: {
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.14)",
-    background: "transparent",
-    cursor: "pointer",
-    opacity: 0.9,
-    whiteSpace: "nowrap",
-  },
-  ghostBtn: {
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.14)",
-    background: "transparent",
-    cursor: "pointer",
-  },
-  disabledBtn: {
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.10)",
-    background: "rgba(255,255,255,0.05)",
-    opacity: 0.5,
-    cursor: "not-allowed",
-    fontWeight: 600,
-  },
-  error: {
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,80,80,0.35)",
-    background: "rgba(255,80,80,0.10)",
-  },
-  addBox: {
-    padding: 14,
-    borderRadius: 14,
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "rgba(255,255,255,0.04)",
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-  },
-  addHeader: { fontWeight: 700, opacity: 0.9 },
-  addActions: { display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 6 },
+  page: {
+    width: "100%",
+    padding: 0,
+    margin: 0,
+  },
+  shell: {
+    width: "100%",
+    maxWidth: 860,
+    margin: 0,
+  },
+  card: {
+    border: "1px solid rgba(0,0,0,0.10)",
+    borderRadius: 18,
+    padding: 18,
+    boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+    background: "#fff",
+  },
+  title: { margin: 0, fontSize: 30, letterSpacing: -0.5, color: "#111" },
+  grid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 16 },
+  block: {
+    padding: 14,
+    borderRadius: 14,
+    border: "1px solid rgba(0,0,0,0.10)",
+    background: "#fafafa",
+  },
+  label: { fontSize: 12, opacity: 0.75, marginBottom: 6, color: "#111" },
+  value: { fontSize: 16, fontWeight: 650, lineHeight: 1.4, color: "#111" },
+  valueBox: {
+    whiteSpace: "pre-wrap",
+    lineHeight: 1.45,
+    background: "#fff",
+    borderRadius: 12,
+    padding: 12,
+    border: "1px solid rgba(0,0,0,0.10)",
+    color: "#111",
+  },
+  checklistHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    flexWrap: "wrap",
+    marginBottom: 12,
+  },
+  smallText: {
+    fontSize: 13,
+    opacity: 0.72,
+    lineHeight: 1.4,
+    color: "#111",
+  },
+  checklistWrap: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+  },
+  metaRow: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  metaPill: {
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: "1px solid rgba(0,0,0,0.12)",
+    background: "#f3f4f6",
+    fontSize: 12,
+    color: "#111",
+  },
+  checklistList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+  },
+  checklistItem: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    alignItems: "start",
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    border: "1px solid rgba(0,0,0,0.10)",
+    background: "#fff",
+  },
+  checklistLeft: {
+    display: "grid",
+    gridTemplateColumns: "16px minmax(0, 1fr)",
+    alignItems: "start",
+    gap: 10,
+    minWidth: 0,
+  },
+  checklistText: {
+    lineHeight: 1.45,
+    whiteSpace: "normal",
+    wordBreak: "break-word",
+    overflowWrap: "anywhere",
+    color: "#111",
+  },
+  checklistTextDone: {
+    textDecoration: "line-through",
+    opacity: 0.6,
+  },
+  minutes: {
+    whiteSpace: "nowrap",
+    fontSize: 13,
+    opacity: 0.85,
+    marginLeft: 8,
+    color: "#111",
+  },
+  actions: { marginTop: 18, display: "flex", justifyContent: "flex-end" },
+  primaryBtn: {
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: "1px solid rgba(0,0,0,0.12)",
+    background: "#f3f4f6",
+    cursor: "pointer",
+    fontWeight: 600,
+    color: "#111",
+  },
+  secondaryBtn: {
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(0,0,0,0.12)",
+    background: "transparent",
+    cursor: "pointer",
+    color: "#111",
+  },
+  disabledBtn: {
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: "1px solid rgba(0,0,0,0.10)",
+    background: "#f3f4f6",
+    opacity: 0.5,
+    cursor: "not-allowed",
+    fontWeight: 600,
+    color: "#111",
+  },
+  error: {
+    marginTop: 12,
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,80,80,0.35)",
+    background: "rgba(255,80,80,0.10)",
+    color: "#111",
+  },
+  errorInline: {
+    marginBottom: 12,
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,80,80,0.35)",
+    background: "rgba(255,80,80,0.10)",
+    color: "#111",
+  },
 };

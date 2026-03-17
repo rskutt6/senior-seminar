@@ -26,6 +26,9 @@ export async function POST(req: Request) {
         'Write a clear summary in 1–3 sentences.',
         'Explain the goal of the assignment and the main tasks the student must complete.',
         'Do not use bullet points or formatting.',
+        'Don t restate every formatting detail.',
+        'Focus only on the main task, required work, and the most important submission requirement'
+
       ].join(' '),
       input: description,
     });
