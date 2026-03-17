@@ -6,4 +6,9 @@ export class AppController {
   health() {
     return { ok: true, service: 'api' };
   }
+
+  @Get('test')
+  test() {
+    return { message: 'PDF route working' };
+  }
 }
