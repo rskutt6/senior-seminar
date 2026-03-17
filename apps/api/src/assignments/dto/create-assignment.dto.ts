@@ -1,7 +1,8 @@
 export type CreateAssignmentDto = {
+  title: string;
   description: string;
-  weight: number;
-  dueAt: string; // ISO date string from frontend
+  weight?: number | null;
+  dueAt?: string | null;
   userId: number;
-  courseId: number;
+  courseId?: number | null;
 };
