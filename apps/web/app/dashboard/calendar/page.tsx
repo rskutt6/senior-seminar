@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import MonthCalendar from './_components/MonthCalendar';
+import { getCurrentUser } from '@/lib/auth';
 
 type ApiAssignment = {
   id: number;
@@ -14,7 +15,8 @@ type ApiAssignment = {
 
 export default function CalendarPage() {
   // TODO: replace with real logged-in user id later
-  const userId = 1;
+  const user = getCurrentUser();
+  const userId = user?.id;
 
   const [assignments, setAssignments] = useState<ApiAssignment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +24,12 @@ export default function CalendarPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      setError('You must be logged in.');
+      return;
+    }
+    
     async function load() {
       setLoading(true);
       setError('');

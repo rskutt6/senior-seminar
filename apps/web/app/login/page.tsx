@@ -24,7 +24,8 @@ export default function LoginPage() {
       alert(data.message || "Login failed");
       return;
     }
-
+    
+    // tells the frontend who is logged in
     localStorage.setItem("user", JSON.stringify(data));
     router.replace("/dashboard");
   };

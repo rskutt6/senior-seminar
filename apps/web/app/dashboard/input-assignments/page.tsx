@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getCurrentUser } from '@/lib/auth';
 
 type Course = {
   id: number;
@@ -44,6 +45,12 @@ export default function InputAssignmentsPage() {
 }, [description, submitting]);
 
   async function loadCourses() {
+    if (userId == null) {
+      setLoadingCourses(false);
+      setError('Not logged in. Please log in again.');
+      return;
+    }
+
     setLoadingCourses(true);
     setError("");
     try {
@@ -64,19 +71,18 @@ export default function InputAssignmentsPage() {
   }
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
+    const user = getCurrentUser();
 
-    if (!storedUser) {
+    if (!user?.id) {
       router.push('/login');
       return;
     }
 
-    const parsedUser = JSON.parse(storedUser);
-    setUserId(parsedUser.id);
+    setUserId(user.id);
   }, [router]);
 
   useEffect(() => {
-    if (userId) {
+    if (userId != null) {
       loadCourses();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -126,7 +132,7 @@ export default function InputAssignmentsPage() {
   e.preventDefault();
   if (!canSubmit) return;
 
-  if (!userId) {
+  if (userId == null) {
     setError('Not logged in. Please log in again.');
     router.push('/login');
     return;
