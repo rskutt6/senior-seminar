@@ -18,11 +18,16 @@ type ChecklistItem = {
   minutes: number;
 };
 
-type ChecklistResponse = {
-  overview: string;
-  totalMinutes: number;
-  checklist: ChecklistItem[];
+type EditableChecklistItem = {
+  id: string;
+  step: string;
+  minutes: number;
+  checked: boolean;
 };
+
+function makeId() {
+  return Math.random().toString(36).slice(2, 10);
+}
 
 export default function InputAssignmentSuccessPage() {
   const params = useSearchParams();
@@ -33,24 +38,29 @@ export default function InputAssignmentSuccessPage() {
 
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [checklistError, setChecklistError] = useState("");
   const [courseLabel, setCourseLabel] = useState("");
+
   const [summary, setSummary] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
+
   const [checklistLoading, setChecklistLoading] = useState(false);
-  const [checklist, setChecklist] = useState<ChecklistResponse | null>(null);
-  const [checkedSteps, setCheckedSteps] = useState<number[]>([]);
+  const [checklistError, setChecklistError] = useState("");
+  const [checklistOverview, setChecklistOverview] = useState("");
+  const [checklistItems, setChecklistItems] = useState<EditableChecklistItem[]>([]);
 
   const prettyDue = useMemo(() => {
     if (!assignment?.dueAt) return "No due date";
     const d = new Date(assignment.dueAt);
-    return isNaN(d.getTime()) ? "No due date" : d.toLocaleString();
+    return Number.isNaN(d.getTime()) ? "No due date" : d.toLocaleString();
   }, [assignment?.dueAt]);
 
-  const checklistProgress = useMemo(() => {
-    if (!checklist || checklist.checklist.length === 0) return "";
-    return `${checkedSteps.length}/${checklist.checklist.length} completed`;
-  }, [checkedSteps, checklist]);
+  const totalMinutes = useMemo(() => {
+    return checklistItems.reduce((sum, item) => sum + (Number(item.minutes) || 0), 0);
+  }, [checklistItems]);
+
+  const completedCount = useMemo(() => {
+    return checklistItems.filter((item) => item.checked).length;
+  }, [checklistItems]);
 
   useEffect(() => {
     async function load() {
@@ -139,8 +149,6 @@ export default function InputAssignmentSuccessPage() {
 
     setChecklistLoading(true);
     setChecklistError("");
-    setChecklist(null);
-    setCheckedSteps([]);
 
     try {
       const res = await fetch("/api/generate-checklist", {
@@ -158,7 +166,17 @@ export default function InputAssignmentSuccessPage() {
         throw new Error(data.error || data.message || "Failed to generate checklist");
       }
 
-      setChecklist(data);
+      const items: EditableChecklistItem[] = Array.isArray(data.checklist)
+        ? data.checklist.map((item: ChecklistItem) => ({
+            id: makeId(),
+            step: item.step,
+            minutes: item.minutes,
+            checked: false,
+          }))
+        : [];
+
+      setChecklistOverview(data.overview || "");
+      setChecklistItems(items);
     } catch (e: any) {
       setChecklistError(e.message || "Failed to generate checklist");
     } finally {
@@ -166,308 +184,497 @@ export default function InputAssignmentSuccessPage() {
     }
   }
 
-  function toggleStep(index: number) {
-    setCheckedSteps((prev) =>
-      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
+  function toggleStep(itemId: string) {
+    setChecklistItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId ? { ...item, checked: !item.checked } : item
+      )
     );
+  }
+
+  function updateStepText(itemId: string, value: string) {
+    setChecklistItems((prev) =>
+      prev.map((item) => (item.id === itemId ? { ...item, step: value } : item))
+    );
+  }
+
+  function updateStepMinutes(itemId: string, value: string) {
+    const num = value === "" ? 0 : Number(value);
+    setChecklistItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId ? { ...item, minutes: Number.isFinite(num) ? num : 0 } : item
+      )
+    );
+  }
+
+  function addChecklistItem() {
+    setChecklistItems((prev) => [
+      ...prev,
+      {
+        id: makeId(),
+        step: "",
+        minutes: 15,
+        checked: false,
+      },
+    ]);
+  }
+
+  function removeChecklistItem(itemId: string) {
+    setChecklistItems((prev) => prev.filter((item) => item.id !== itemId));
   }
 
   return (
     <main style={styles.page}>
       <div style={styles.shell}>
-        <div style={styles.card}>
-          <h1 style={styles.title}>Assignment created ✅</h1>
+        <div style={styles.headerRow}>
+          <div>
+            <h1 style={styles.title}>Assignment created ✅</h1>
+            <p style={styles.subTitle}>Review, edit, and plan your work.</p>
+          </div>
 
-          {loadError && <div style={styles.error}>{loadError}</div>}
+          <button
+            style={styles.secondaryBtn}
+            onClick={() => router.push(`/dashboard/input-assignments?userId=${userId}`)}
+          >
+            Add another
+          </button>
+        </div>
 
-          {assignment && (
-            <div style={styles.grid}>
-              <div style={styles.block}>
-                <div style={styles.label}>Assignment title</div>
-                <div style={styles.value}>{assignment.title?.trim() || "Not set"}</div>
-              </div>
+        {loadError && <div style={styles.error}>{loadError}</div>}
 
-              <div style={styles.block}>
-                <div style={styles.label}>Class</div>
-                <div style={styles.value}>
-                  {assignment.courseId
-                    ? courseLabel || `Course #${assignment.courseId}`
-                    : "No course selected"}
+        {assignment && (
+          <div style={styles.stack}>
+            <section style={styles.card}>
+              <div style={styles.sectionTitle}>Assignment details</div>
+
+              <div style={styles.infoGrid}>
+                <div style={styles.infoItem}>
+                  <div style={styles.label}>Title</div>
+                  <div style={styles.value}>{assignment.title?.trim() || "Not set"}</div>
+                </div>
+
+                <div style={styles.infoItem}>
+                  <div style={styles.label}>Class</div>
+                  <div style={styles.value}>
+                    {assignment.courseId
+                      ? courseLabel || `Course #${assignment.courseId}`
+                      : "No course selected"}
+                  </div>
+                </div>
+
+                <div style={styles.infoItem}>
+                  <div style={styles.label}>Due</div>
+                  <div style={styles.value}>{prettyDue}</div>
+                </div>
+
+                <div style={styles.infoItem}>
+                  <div style={styles.label}>Weight</div>
+                  <div style={styles.value}>
+                    {assignment.weight === null || assignment.weight === undefined
+                      ? "Not set"
+                      : `${assignment.weight}%`}
+                  </div>
                 </div>
               </div>
 
-              <div style={styles.block}>
-                <div style={styles.label}>Due</div>
-                <div style={styles.value}>{prettyDue}</div>
-              </div>
-
-              <div style={styles.block}>
-                <div style={styles.label}>Weight</div>
-                <div style={styles.value}>
-                  {assignment.weight === null || assignment.weight === undefined
-                    ? "Not set"
-                    : `${assignment.weight}%`}
-                </div>
-              </div>
-
-              <div style={{ ...styles.block, gridColumn: "1 / -1" }}>
+              <div style={styles.fullBlock}>
                 <div style={styles.label}>Details</div>
                 <div style={styles.valueBox}>{assignment.description}</div>
               </div>
+            </section>
 
-              <div style={{ ...styles.block, gridColumn: "1 / -1" }}>
-                <div style={styles.label}>AI summary</div>
-                <div style={styles.valueBox}>
-                  {summaryLoading ? "Summarizing…" : summary || "No summary"}
-                </div>
+            <section style={styles.card}>
+              <div style={styles.sectionTitle}>AI summary</div>
+              <div style={styles.smallMuted}>Short version of the assignment.</div>
+
+              <div style={styles.summaryBox}>
+                {summaryLoading ? "Summarizing…" : summary || "No summary"}
               </div>
+            </section>
 
-              <div style={{ ...styles.block, gridColumn: "1 / -1" }}>
-                <div style={styles.checklistHeader}>
-                  <div>
-                    <div style={styles.label}>Checklist</div>
-                    <div style={styles.smallText}>
-                      Break the assignment into steps with estimated times.
-                    </div>
+            <section style={styles.card}>
+              <div style={styles.cardTopRow}>
+                <div>
+                  <div style={styles.sectionTitle}>Checklist</div>
+                  <div style={styles.smallMuted}>
+                    Edit tasks, rename them, change minutes, add items, or remove them.
                   </div>
+                </div>
+
+                <div style={styles.buttonRow}>
+                  <button style={styles.secondaryBtn} type="button" onClick={addChecklistItem}>
+                    + Add item
+                  </button>
 
                   <button
                     style={checklistLoading ? styles.disabledBtn : styles.primaryBtn}
+                    type="button"
                     onClick={handleGenerateChecklist}
                     disabled={checklistLoading}
                   >
                     {checklistLoading ? "Generating…" : "Generate checklist"}
                   </button>
                 </div>
-
-                {checklistError && <div style={styles.errorInline}>{checklistError}</div>}
-
-                {!checklist && !checklistLoading && (
-                  <div style={styles.valueBox}>
-                    No checklist yet.
-                  </div>
-                )}
-
-                {checklist && (
-                  <div style={styles.checklistWrap}>
-                    <div style={styles.metaRow}>
-                      <div style={styles.metaPill}>Total time: {checklist.totalMinutes} min</div>
-                      <div style={styles.metaPill}>{checklistProgress}</div>
-                    </div>
-
-                    <div style={styles.valueBox}>{checklist.overview}</div>
-
-                    <div style={styles.checklistList}>
-                      {checklist.checklist.map((item, index) => {
-                        const checked = checkedSteps.includes(index);
-
-                        return (
-                          <label key={index} style={styles.checklistItem}>
-                            <div style={styles.checklistLeft}>
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleStep(index)}
-                              />
-                              <span
-                                style={{
-                                  ...styles.checklistText,
-                                  ...(checked ? styles.checklistTextDone : {}),
-                                }}
-                              >
-                                {item.step}
-                              </span>
-                            </div>
-
-                            <span style={styles.minutes}>{item.minutes} min</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
               </div>
-            </div>
-          )}
 
-          <div style={styles.actions}>
-            <button
-              style={styles.secondaryBtn}
-              onClick={() => router.push(`/dashboard/input-assignments?userId=${userId}`)}
-            >
-              Add another
-            </button>
+              {checklistError && <div style={styles.errorInline}>{checklistError}</div>}
+
+              <div style={styles.metaRow}>
+                <div style={styles.metaPill}>Total time: {totalMinutes} min</div>
+                <div style={styles.metaPill}>
+                  {completedCount}/{checklistItems.length} completed
+                </div>
+              </div>
+
+              <textarea
+                value={checklistOverview}
+                onChange={(e) => setChecklistOverview(e.target.value)}
+                placeholder="Checklist overview..."
+                style={styles.overviewTextarea}
+              />
+
+              {!checklistItems.length && !checklistLoading && (
+                <div style={styles.emptyBox}>No checklist yet.</div>
+              )}
+
+              {!!checklistItems.length && (
+                <div style={styles.tableWrap}>
+                  <div style={styles.tableHeader}>
+                    <div>Done</div>
+                    <div>Task</div>
+                    <div>Minutes</div>
+                    <div>Action</div>
+                  </div>
+
+                  {checklistItems.map((item) => (
+                    <div key={item.id} style={styles.tableRow}>
+                      <div style={styles.doneCell}>
+                        <input
+                          type="checkbox"
+                          checked={item.checked}
+                          onChange={() => toggleStep(item.id)}
+                        />
+                      </div>
+
+                      <input
+                        value={item.step}
+                        onChange={(e) => updateStepText(item.id, e.target.value)}
+                        placeholder="Task name"
+                        style={{
+                          ...styles.taskInput,
+                          ...(item.checked ? styles.taskInputDone : {}),
+                        }}
+                      />
+
+                      <input
+                        type="number"
+                        min={0}
+                        value={item.minutes}
+                        onChange={(e) => updateStepMinutes(item.id, e.target.value)}
+                        style={styles.minutesInput}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => removeChecklistItem(item.id)}
+                        style={styles.removeBtn}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
-        </div>
+        )}
       </div>
     </main>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    padding: "24px 20px",
-    display: "flex",
-    justifyContent: "center",
-    color: "#111",
-  },
-  shell: {
-    width: "100%",
-    maxWidth: 860,
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginBottom: 14,
-    color: "#111",
-  },
-  title: {
-    margin: 0,
-    fontSize: 34,
-    letterSpacing: -0.5,
-    color: "#111",
-  },
-  subTitle: {
-    margin: "6px 0 0",
-    color: "rgba(17,17,17,0.72)",
-  },
-  card: {
-    border: "1px solid rgba(0,0,0,0.08)",
-    borderRadius: 18,
-    padding: 18,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-    background: "#ffffff",
-    color: "#111",
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 14,
-  },
-  row: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-  },
-  label: {
-    fontSize: 14,
-    color: "rgba(17,17,17,0.82)",
-  },
-  smallLabel: {
-    fontSize: 12,
-    color: "rgba(17,17,17,0.72)",
-  },
-  inline: {
-    display: "flex",
-    gap: 10,
-    alignItems: "center",
-    flexWrap: "wrap",
-  },
-  split: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 14,
-  },
-  input: {
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(0,0,0,0.12)",
-    background: "#fff",
-    outline: "none",
-    color: "#111",
-  },
-  select: {
-    flex: 1,
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(0,0,0,0.12)",
-    background: "#fff",
-    outline: "none",
-    color: "#111",
-    minWidth: 220,
-  },
-  textarea: {
-    width: "100%",
-    minHeight: 140,
-    padding: "14px 12px",
-    borderRadius: 14,
-    border: "1px solid rgba(0,0,0,0.12)",
-    background: "#fff",
-    outline: "none",
-    resize: "vertical",
-    fontSize: 15,
-    lineHeight: 1.45,
-    color: "#111",
-  },
-  actions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    marginTop: 2,
-  },
-  primaryBtn: {
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "1px solid rgba(0,0,0,0.12)",
-    background: "#f3f4f6",
-    cursor: "pointer",
-    fontWeight: 600,
-    color: "#111",
-  },
-  secondaryBtn: {
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(0,0,0,0.12)",
-    background: "#fff",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-    color: "#111",
-  },
-  ghostBtn: {
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(0,0,0,0.12)",
-    background: "#fff",
-    cursor: "pointer",
-    color: "#111",
-  },
-  disabledBtn: {
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "1px solid rgba(0,0,0,0.10)",
-    background: "#f3f4f6",
-    opacity: 0.5,
-    cursor: "not-allowed",
-    fontWeight: 600,
-    color: "#111",
-  },
-  error: {
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,80,80,0.35)",
-    background: "rgba(255,80,80,0.10)",
-    color: "#111",
-  },
-  addBox: {
-    padding: 14,
-    borderRadius: 14,
-    border: "1px solid rgba(0,0,0,0.08)",
-    background: "#fafafa",
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-  },
-  addHeader: {
-    fontWeight: 700,
-    color: "#111",
-  },
-  addActions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: 10,
-    marginTop: 6,
-  },
+  page: {
+    width: "100%",
+    padding: "20px 24px",
+    color: "#111",
+  },
+
+  shell: {
+    width: "100%",
+    maxWidth: 980,
+    margin: "0 auto",
+  },
+
+  headerRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 16,
+    flexWrap: "wrap",
+  },
+
+  title: {
+    margin: 0,
+    fontSize: 30,
+    letterSpacing: -0.5,
+    color: "#111",
+  },
+
+  subTitle: {
+    margin: "6px 0 0",
+    color: "rgba(17,17,17,0.68)",
+  },
+
+  stack: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 14,
+  },
+
+  card: {
+    width: "100%",
+    border: "1px solid rgba(0,0,0,0.08)",
+    borderRadius: 18,
+    padding: 18,
+    background: "#fff",
+    boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+  },
+
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: "#111",
+    marginBottom: 4,
+  },
+
+  smallMuted: {
+    fontSize: 13,
+    color: "rgba(17,17,17,0.68)",
+    marginBottom: 12,
+  },
+
+  infoGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 12,
+  },
+
+  infoItem: {
+    padding: 12,
+    borderRadius: 12,
+    border: "1px solid rgba(0,0,0,0.10)",
+    background: "#fafafa",
+  },
+
+  fullBlock: {
+    marginTop: 12,
+  },
+
+  label: {
+    fontSize: 12,
+    color: "rgba(17,17,17,0.65)",
+    marginBottom: 6,
+  },
+
+  value: {
+    fontSize: 16,
+    fontWeight: 600,
+    color: "#111",
+    lineHeight: 1.4,
+  },
+
+  valueBox: {
+    whiteSpace: "pre-wrap",
+    lineHeight: 1.5,
+    background: "#fff",
+    borderRadius: 12,
+    padding: 12,
+    border: "1px solid rgba(0,0,0,0.10)",
+    color: "#111",
+  },
+
+  summaryBox: {
+    whiteSpace: "pre-wrap",
+    lineHeight: 1.5,
+    background: "#fff",
+    borderRadius: 12,
+    padding: 12,
+    border: "1px solid rgba(0,0,0,0.10)",
+    color: "#111",
+    maxWidth: "100%",
+  },
+
+  cardTopRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    flexWrap: "wrap",
+    marginBottom: 12,
+  },
+
+  buttonRow: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+
+  metaRow: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    marginBottom: 12,
+  },
+
+  metaPill: {
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: "1px solid rgba(0,0,0,0.12)",
+    background: "#f3f4f6",
+    fontSize: 12,
+    color: "#111",
+  },
+
+  overviewTextarea: {
+    width: "100%",
+    minHeight: 72,
+    padding: "12px",
+    borderRadius: 12,
+    border: "1px solid rgba(0,0,0,0.14)",
+    background: "#fff",
+    color: "#111",
+    outline: "none",
+    resize: "vertical",
+    fontSize: 14,
+    lineHeight: 1.45,
+    marginBottom: 12,
+  },
+
+  emptyBox: {
+    padding: 12,
+    borderRadius: 12,
+    border: "1px solid rgba(0,0,0,0.10)",
+    background: "#fff",
+    color: "rgba(17,17,17,0.65)",
+  },
+
+  tableWrap: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+
+  tableHeader: {
+    display: "grid",
+    gridTemplateColumns: "70px minmax(0, 1fr) 100px 96px",
+    gap: 10,
+    fontSize: 12,
+    color: "rgba(17,17,17,0.62)",
+    padding: "0 4px",
+    alignItems: "center",
+  },
+
+  tableRow: {
+    display: "grid",
+    gridTemplateColumns: "70px minmax(0, 1fr) 100px 96px",
+    gap: 10,
+    alignItems: "center",
+    padding: 10,
+    borderRadius: 12,
+    border: "1px solid rgba(0,0,0,0.10)",
+    background: "#fff",
+  },
+
+  doneCell: {
+    display: "flex",
+    justifyContent: "center",
+  },
+
+  taskInput: {
+    width: "100%",
+    minWidth: 0,
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid rgba(0,0,0,0.14)",
+    background: "#fff",
+    color: "#111",
+    outline: "none",
+    fontSize: 14,
+  },
+
+  taskInputDone: {
+    textDecoration: "line-through",
+    opacity: 0.6,
+  },
+
+  minutesInput: {
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid rgba(0,0,0,0.14)",
+    background: "#fff",
+    color: "#111",
+    outline: "none",
+    fontSize: 14,
+  },
+
+  removeBtn: {
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid rgba(0,0,0,0.12)",
+    background: "#fff",
+    color: "#111",
+    cursor: "pointer",
+    fontSize: 13,
+  },
+
+  secondaryBtn: {
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(0,0,0,0.12)",
+    background: "#fff",
+    cursor: "pointer",
+    color: "#111",
+  },
+
+  primaryBtn: {
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: "1px solid rgba(0,0,0,0.12)",
+    background: "#f3f4f6",
+    cursor: "pointer",
+    fontWeight: 600,
+    color: "#111",
+  },
+
+  disabledBtn: {
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: "1px solid rgba(0,0,0,0.10)",
+    background: "#f3f4f6",
+    opacity: 0.5,
+    cursor: "not-allowed",
+    fontWeight: 600,
+    color: "#111",
+  },
+
+  error: {
+    marginBottom: 12,
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,80,80,0.35)",
+    background: "rgba(255,80,80,0.10)",
+    color: "#111",
+  },
+
+  errorInline: {
+    marginBottom: 12,
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,80,80,0.35)",
+    background: "rgba(255,80,80,0.10)",
+    color: "#111",
+  },
 };
