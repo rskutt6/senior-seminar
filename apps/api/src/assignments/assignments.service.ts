@@ -68,6 +68,10 @@ export class AssignmentsService {
   }
 
   async listForUser(userId: number) {
+    if (userId == null || Number.isNaN(userId)) {
+      throw new BadRequestException('valid userId required');
+      }
+
     const { rows } = await this.pool.query(
       `
       SELECT
@@ -89,6 +93,14 @@ export class AssignmentsService {
   }
 
   async getOneForUser(assignmentId: number, userId: number) {
+    if (assignmentId == null || Number.isNaN(assignmentId)) {
+      throw new BadRequestException('valid assignmentId required');
+    }
+
+    if (userId == null || Number.isNaN(userId)) {
+      throw new BadRequestException('valid userId required');
+    }
+
     const { rows } = await this.pool.query(
       `
       SELECT
@@ -110,6 +122,14 @@ export class AssignmentsService {
   }
 
   async delete(assignmentId: number, userId: number) {
+    if (assignmentId == null || Number.isNaN(assignmentId)) {
+      throw new BadRequestException('valid assignmentId required');
+    }
+
+    if (userId == null || Number.isNaN(userId)) {
+      throw new BadRequestException('valid userId required');
+    }
+
     await this.pool.query(
       `
       DELETE FROM public."Assignment"
