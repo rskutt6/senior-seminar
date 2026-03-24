@@ -1,20 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import * as fs from 'fs';
-
-// pull the class from the module
-const { PDFParse } = require('pdf-parse');
+const pdfParse = require('pdf-parse');
 
 @Injectable()
 export class PdfService {
   async parseFromFile(path: string): Promise<string> {
     const buffer = fs.readFileSync(path);
+    const result = await pdfParse(buffer);
+    return result.text;
+  }
 
-    // create a parser instance with the buffer
-    const parser = new PDFParse({ data: buffer });
-
-    // parse the PDF
-    const result = await parser.parse();
-
+  async parseFromBuffer(buffer: Buffer): Promise<string> {
+    const result = await pdfParse(buffer);
     return result.text;
   }
 }

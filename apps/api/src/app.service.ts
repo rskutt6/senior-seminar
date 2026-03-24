@@ -1,6 +1,6 @@
 // pdf.service.ts
 import fs from 'fs';
-import pdf from 'pdf-parse';
+const pdf = require('pdf-parse');
 
 export class PdfService {
   async parseFromFile(filename: string) {
