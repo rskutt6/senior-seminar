@@ -7,9 +7,11 @@ import {
   Delete,
   Param,
   ParseIntPipe,
+  Patch,
 } from '@nestjs/common';
 import { AssignmentsService } from './assignments.service';
 import * as createAssignmentDto from './dto/create-assignment.dto';
+import * as updateAssignmentDto from './dto/update-assignment.dto';
 
 @Controller('assignments')
 export class AssignmentsController {
@@ -18,6 +20,15 @@ export class AssignmentsController {
   @Post()
   async create(@Body() dto: createAssignmentDto.CreateAssignmentDto) {
     return this.assignments.create(dto);
+  }
+
+  @Patch(':id')
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('userId', ParseIntPipe) userId: number,
+    @Body() dto: updateAssignmentDto.UpdateAssignmentDto,
+  ) {
+    return this.assignments.update(id, userId, dto);
   }
 
   @Get()

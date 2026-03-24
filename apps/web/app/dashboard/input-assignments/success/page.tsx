@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type Assignment = {
   id: number;
@@ -11,6 +11,13 @@ type Assignment = {
   dueAt: string | null;
   userId: number;
   courseId: number | null;
+};
+
+type Course = {
+  id: number;
+  name: string;
+  userId: number;
+  createdAt: string;
 };
 
 type ChecklistItem = {
@@ -29,6 +36,33 @@ function makeId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+function toLocalDateTimeInputValue(value: string | null) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
+}
+
+function RequiredLabel({
+  label,
+  missing,
+}: {
+  label: string;
+  missing: boolean;
+}) {
+  return (
+    <span>
+      {label}
+      {missing ? <span className="ml-1 text-red-500">*</span> : null}
+    </span>
+  );
+}
+
 export default function InputAssignmentSuccessPage() {
   const params = useSearchParams();
   const router = useRouter();
@@ -37,8 +71,18 @@ export default function InputAssignmentSuccessPage() {
   const userId = params.get("userId");
 
   const [assignment, setAssignment] = useState<Assignment | null>(null);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loadError, setLoadError] = useState("");
-  const [courseLabel, setCourseLabel] = useState("");
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [weight, setWeight] = useState("");
+  const [dueAtLocal, setDueAtLocal] = useState("");
+  const [selectedCourseId, setSelectedCourseId] = useState("");
+
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
 
   const [summary, setSummary] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -48,11 +92,10 @@ export default function InputAssignmentSuccessPage() {
   const [checklistOverview, setChecklistOverview] = useState("");
   const [checklistItems, setChecklistItems] = useState<EditableChecklistItem[]>([]);
 
-  const prettyDue = useMemo(() => {
-    if (!assignment?.dueAt) return "No due date";
-    const d = new Date(assignment.dueAt);
-    return Number.isNaN(d.getTime()) ? "No due date" : d.toLocaleString();
-  }, [assignment?.dueAt]);
+  const missingTitle = !title.trim();
+  const missingCourse = !selectedCourseId.trim();
+  const missingDueAt = !dueAtLocal.trim();
+  const missingWeight = !weight.trim();
 
   const totalMinutes = useMemo(() => {
     return checklistItems.reduce((sum, item) => sum + (Number(item.minutes) || 0), 0);
@@ -69,23 +112,44 @@ export default function InputAssignmentSuccessPage() {
         return;
       }
 
-      const res = await fetch(`http://localhost:4000/assignments/${id}?userId=${userId}`, {
-        cache: "no-store",
-      });
+      try {
+        const [assignmentRes, coursesRes] = await Promise.all([
+          fetch(`http://localhost:4000/assignments/${id}?userId=${userId}`, {
+            cache: "no-store",
+          }),
+          fetch(`http://localhost:4000/courses?userId=${userId}`, {
+            cache: "no-store",
+          }),
+        ]);
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setLoadError(data.message || "Failed to load assignment");
-        return;
+        const assignmentData = await assignmentRes.json().catch(() => ({}));
+        const courseData = await coursesRes.json().catch(() => []);
+
+        if (!assignmentRes.ok) {
+          throw new Error(assignmentData.message || "Failed to load assignment");
+        }
+
+        const loadedAssignment = assignmentData as Assignment;
+
+        setAssignment(loadedAssignment);
+        setCourses(Array.isArray(courseData) ? courseData : []);
+
+        setTitle(loadedAssignment.title ?? "");
+        setDescription(loadedAssignment.description ?? "");
+        setWeight(
+          loadedAssignment.weight === null || loadedAssignment.weight === undefined
+            ? ""
+            : String(loadedAssignment.weight)
+        );
+        setDueAtLocal(toLocalDateTimeInputValue(loadedAssignment.dueAt));
+        setSelectedCourseId(
+          loadedAssignment.courseId === null || loadedAssignment.courseId === undefined
+            ? ""
+            : String(loadedAssignment.courseId)
+        );
+      } catch (e: any) {
+        setLoadError(e.message || "Failed to load assignment");
       }
-
-      const data = (await res.json()) as Assignment | null;
-      if (!data) {
-        setLoadError("Assignment not found");
-        return;
-      }
-
-      setAssignment(data);
     }
 
     load();
@@ -93,7 +157,7 @@ export default function InputAssignmentSuccessPage() {
 
   useEffect(() => {
     async function summarize() {
-      if (!assignment?.description) return;
+      if (!description.trim()) return;
 
       setSummaryLoading(true);
       try {
@@ -101,8 +165,8 @@ export default function InputAssignmentSuccessPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            title: assignment.title ?? "",
-            description: assignment.description,
+            title,
+            description,
           }),
         });
 
@@ -118,69 +182,105 @@ export default function InputAssignmentSuccessPage() {
     }
 
     summarize();
-  }, [assignment?.title, assignment?.description]);
+  }, [title, description]);
 
   useEffect(() => {
-    async function loadCourseLabel() {
-      if (!assignment?.courseId || !assignment?.userId) return;
+    async function generateChecklist() {
+      if (!description.trim()) return;
+
+      setChecklistLoading(true);
+      setChecklistError("");
 
       try {
-        const res = await fetch(
-          `http://localhost:4000/courses?userId=${assignment.userId}`,
-          { cache: "no-store" }
-        );
+        const res = await fetch("/api/generate-checklist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            description,
+          }),
+        });
 
-        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
 
-        const courses = await res.json();
-        const course = courses.find((c: any) => c.id === assignment.courseId);
+        if (!res.ok) {
+          throw new Error(data.error || data.message || "Failed to generate checklist");
+        }
 
-        setCourseLabel(course?.name ?? `Course #${assignment.courseId}`);
-      } catch {
-        // ignore
+        const items: EditableChecklistItem[] = Array.isArray(data.checklist)
+          ? data.checklist.map((item: ChecklistItem) => ({
+              id: makeId(),
+              step: item.step,
+              minutes: item.minutes,
+              checked: false,
+            }))
+          : [];
+
+        setChecklistOverview(data.overview || "");
+        setChecklistItems(items);
+      } catch (e: any) {
+        setChecklistError(e.message || "Failed to generate checklist");
+      } finally {
+        setChecklistLoading(false);
       }
     }
 
-    loadCourseLabel();
-  }, [assignment?.courseId, assignment?.userId]);
+    generateChecklist();
+  }, [title, description]);
 
-  async function handleGenerateChecklist() {
-    if (!assignment?.description?.trim()) return;
+  async function handleSaveChanges() {
+    if (!assignment || !userId) return;
 
-    setChecklistLoading(true);
-    setChecklistError("");
+    setSaving(true);
+    setSaveError("");
+    setSaveMessage("");
 
     try {
-      const res = await fetch("/api/generate-checklist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: assignment.title ?? "",
-          description: assignment.description,
-        }),
-      });
+      const body: any = {
+        title: title.trim(),
+        description: description.trim(),
+        courseId: selectedCourseId.trim() ? Number(selectedCourseId) : null,
+        weight: weight.trim() ? Number(weight) : null,
+        dueAt: dueAtLocal.trim() ? new Date(dueAtLocal).toISOString() : null,
+      };
+
+      if (!body.title) {
+        throw new Error("Title is required.");
+      }
+
+      if (!body.description) {
+        throw new Error("Description is required.");
+      }
+
+      if (weight.trim() && !Number.isFinite(body.weight)) {
+        throw new Error("Weight must be a valid number.");
+      }
+
+      if (dueAtLocal.trim() && Number.isNaN(new Date(dueAtLocal).getTime())) {
+        throw new Error("Due date is invalid.");
+      }
+
+      const res = await fetch(
+        `http://localhost:4000/assignments/${assignment.id}?userId=${userId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }
+      );
 
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data.error || data.message || "Failed to generate checklist");
+        throw new Error(data.message || "Failed to save changes");
       }
 
-      const items: EditableChecklistItem[] = Array.isArray(data.checklist)
-        ? data.checklist.map((item: ChecklistItem) => ({
-            id: makeId(),
-            step: item.step,
-            minutes: item.minutes,
-            checked: false,
-          }))
-        : [];
-
-      setChecklistOverview(data.overview || "");
-      setChecklistItems(items);
+      setAssignment(data);
+      setSaveMessage("Changes saved.");
     } catch (e: any) {
-      setChecklistError(e.message || "Failed to generate checklist");
+      setSaveError(e.message || "Failed to save changes");
     } finally {
-      setChecklistLoading(false);
+      setSaving(false);
     }
   }
 
@@ -224,104 +324,180 @@ export default function InputAssignmentSuccessPage() {
   }
 
   return (
-    <main style={styles.page}>
-      <div style={styles.shell}>
-        <div style={styles.headerRow}>
+    <main className="w-full px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-5xl">
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 style={styles.title}>Assignment created ✅</h1>
-            <p style={styles.subTitle}>Review, edit, and plan your work.</p>
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+              Review assignment
+            </h1>
+            <p className="mt-2 text-sm text-slate-600">
+              Edit anything the AI got wrong before you move on.
+            </p>
           </div>
 
           <button
-            style={styles.secondaryBtn}
-            onClick={() => router.push(`/dashboard/input-assignments?userId=${userId}`)}
+            type="button"
+            onClick={() => router.push("/dashboard/input-assignments")}
+            className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
           >
             Add another
           </button>
         </div>
 
-        {loadError && <div style={styles.error}>{loadError}</div>}
+        {loadError ? (
+          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {loadError}
+          </div>
+        ) : null}
 
-        {assignment && (
-          <div style={styles.stack}>
-            <section style={styles.card}>
-              <div style={styles.sectionTitle}>Assignment details</div>
-
-              <div style={styles.infoGrid}>
-                <div style={styles.infoItem}>
-                  <div style={styles.label}>Title</div>
-                  <div style={styles.value}>{assignment.title?.trim() || "Not set"}</div>
-                </div>
-
-                <div style={styles.infoItem}>
-                  <div style={styles.label}>Class</div>
-                  <div style={styles.value}>
-                    {assignment.courseId
-                      ? courseLabel || `Course #${assignment.courseId}`
-                      : "No course selected"}
-                  </div>
-                </div>
-
-                <div style={styles.infoItem}>
-                  <div style={styles.label}>Due</div>
-                  <div style={styles.value}>{prettyDue}</div>
-                </div>
-
-                <div style={styles.infoItem}>
-                  <div style={styles.label}>Weight</div>
-                  <div style={styles.value}>
-                    {assignment.weight === null || assignment.weight === undefined
-                      ? "Not set"
-                      : `${assignment.weight}%`}
-                  </div>
-                </div>
-              </div>
-
-              <div style={styles.fullBlock}>
-                <div style={styles.label}>Details</div>
-                <div style={styles.valueBox}>{assignment.description}</div>
-              </div>
-            </section>
-
-            <section style={styles.card}>
-              <div style={styles.sectionTitle}>AI summary</div>
-              <div style={styles.smallMuted}>Short version of the assignment.</div>
-
-              <div style={styles.summaryBox}>
-                {summaryLoading ? "Summarizing…" : summary || "No summary"}
-              </div>
-            </section>
-
-            <section style={styles.card}>
-              <div style={styles.cardTopRow}>
+        {assignment ? (
+          <div className="space-y-4">
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div style={styles.sectionTitle}>Checklist</div>
-                  <div style={styles.smallMuted}>
-                    Edit tasks, rename them, change minutes, add items, or remove them.
-                  </div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    Detected assignment details
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Fields marked with a red asterisk still need to be filled in manually.
+                  </p>
                 </div>
 
-                <div style={styles.buttonRow}>
-                  <button style={styles.secondaryBtn} type="button" onClick={addChecklistItem}>
-                    + Add item
-                  </button>
-
-                  <button
-                    style={checklistLoading ? styles.disabledBtn : styles.primaryBtn}
-                    type="button"
-                    onClick={handleGenerateChecklist}
-                    disabled={checklistLoading}
-                  >
-                    {checklistLoading ? "Generating…" : "Generate checklist"}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveChanges}
+                  disabled={saving}
+                  className="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {saving ? "Saving..." : "Save changes"}
+                </button>
               </div>
 
-              {checklistError && <div style={styles.errorInline}>{checklistError}</div>}
+              {saveError ? (
+                <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {saveError}
+                </div>
+              ) : null}
 
-              <div style={styles.metaRow}>
-                <div style={styles.metaPill}>Total time: {totalMinutes} min</div>
-                <div style={styles.metaPill}>
+              {saveMessage ? (
+                <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  {saveMessage}
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="md:col-span-2 space-y-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    <RequiredLabel label="Title" missing={missingTitle} />
+                  </label>
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Enter assignment title"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    <RequiredLabel label="Class" missing={missingCourse} />
+                  </label>
+                  <select
+                    value={selectedCourseId}
+                    onChange={(e) => setSelectedCourseId(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  >
+                    <option value="">Select a class</option>
+                    {courses.map((course) => (
+                      <option key={course.id} value={course.id}>
+                        {course.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    <RequiredLabel label="Due date" missing={missingDueAt} />
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={dueAtLocal}
+                    onChange={(e) => setDueAtLocal(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    <RequiredLabel label="Weight (%)" missing={missingWeight} />
+                  </label>
+                  <input
+                    type="number"
+                    value={weight}
+                    onChange={(e) => setWeight(e.target.value)}
+                    placeholder="20"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  />
+                </div>
+
+                <div className="md:col-span-2 space-y-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    Assignment description
+                  </label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={10}
+                    className="min-h-[220px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-3">
+                <h2 className="text-lg font-semibold text-slate-900">AI summary</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Short version of the assignment.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800">
+                {summaryLoading ? "Summarizing..." : summary || "No summary"}
+              </div>
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Checklist</h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Edit tasks, rename them, change minutes, add items, or remove them.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addChecklistItem}
+                  className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                >
+                  + Add item
+                </button>
+              </div>
+
+              {checklistError ? (
+                <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {checklistError}
+                </div>
+              ) : null}
+
+              <div className="mb-4 flex flex-wrap gap-2">
+                <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                  Total time: {totalMinutes} min
+                </div>
+                <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
                   {completedCount}/{checklistItems.length} completed
                 </div>
               </div>
@@ -330,16 +506,18 @@ export default function InputAssignmentSuccessPage() {
                 value={checklistOverview}
                 onChange={(e) => setChecklistOverview(e.target.value)}
                 placeholder="Checklist overview..."
-                style={styles.overviewTextarea}
+                className="mb-4 min-h-[88px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
               />
 
-              {!checklistItems.length && !checklistLoading && (
-                <div style={styles.emptyBox}>No checklist yet.</div>
-              )}
+              {!checklistItems.length && !checklistLoading ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                  No checklist yet.
+                </div>
+              ) : null}
 
-              {!!checklistItems.length && (
-                <div style={styles.tableWrap}>
-                  <div style={styles.tableHeader}>
+              {checklistItems.length ? (
+                <div className="space-y-3">
+                  <div className="hidden grid-cols-[72px_minmax(0,1fr)_110px_90px] gap-3 px-1 text-xs font-medium uppercase tracking-wide text-slate-500 md:grid">
                     <div>Done</div>
                     <div>Task</div>
                     <div>Minutes</div>
@@ -347,23 +525,29 @@ export default function InputAssignmentSuccessPage() {
                   </div>
 
                   {checklistItems.map((item) => (
-                    <div key={item.id} style={styles.tableRow}>
-                      <div style={styles.doneCell}>
-                        <input
-                          type="checkbox"
-                          checked={item.checked}
-                          onChange={() => toggleStep(item.id)}
-                        />
+                    <div
+                      key={item.id}
+                      className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-3 md:grid-cols-[72px_minmax(0,1fr)_110px_90px] md:items-center"
+                    >
+                      <div className="flex items-center justify-start md:justify-center">
+                        <label className="inline-flex items-center gap-2 text-sm text-slate-600 md:text-xs">
+                          <input
+                            type="checkbox"
+                            checked={item.checked}
+                            onChange={() => toggleStep(item.id)}
+                            className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                          />
+                          <span className="md:hidden">Done</span>
+                        </label>
                       </div>
 
                       <input
                         value={item.step}
                         onChange={(e) => updateStepText(item.id, e.target.value)}
                         placeholder="Task name"
-                        style={{
-                          ...styles.taskInput,
-                          ...(item.checked ? styles.taskInputDone : {}),
-                        }}
+                        className={`w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-200 ${
+                          item.checked ? "text-slate-400 line-through" : "text-slate-900"
+                        }`}
                       />
 
                       <input
@@ -371,310 +555,24 @@ export default function InputAssignmentSuccessPage() {
                         min={0}
                         value={item.minutes}
                         onChange={(e) => updateStepMinutes(item.id, e.target.value)}
-                        style={styles.minutesInput}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
                       />
 
                       <button
                         type="button"
                         onClick={() => removeChecklistItem(item.id)}
-                        style={styles.removeBtn}
+                        className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
                       >
                         Remove
                       </button>
                     </div>
                   ))}
                 </div>
-              )}
+              ) : null}
             </section>
           </div>
-        )}
+        ) : null}
       </div>
     </main>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    width: "100%",
-    padding: "20px 24px",
-    color: "#111",
-  },
-
-  shell: {
-    width: "100%",
-    maxWidth: 980,
-    margin: "0 auto",
-  },
-
-  headerRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
-    marginBottom: 16,
-    flexWrap: "wrap",
-  },
-
-  title: {
-    margin: 0,
-    fontSize: 30,
-    letterSpacing: -0.5,
-    color: "#111",
-  },
-
-  subTitle: {
-    margin: "6px 0 0",
-    color: "rgba(17,17,17,0.68)",
-  },
-
-  stack: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 14,
-  },
-
-  card: {
-    width: "100%",
-    border: "1px solid rgba(0,0,0,0.08)",
-    borderRadius: 18,
-    padding: 18,
-    background: "#fff",
-    boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-  },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 700,
-    color: "#111",
-    marginBottom: 4,
-  },
-
-  smallMuted: {
-    fontSize: 13,
-    color: "rgba(17,17,17,0.68)",
-    marginBottom: 12,
-  },
-
-  infoGrid: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 12,
-  },
-
-  infoItem: {
-    padding: 12,
-    borderRadius: 12,
-    border: "1px solid rgba(0,0,0,0.10)",
-    background: "#fafafa",
-  },
-
-  fullBlock: {
-    marginTop: 12,
-  },
-
-  label: {
-    fontSize: 12,
-    color: "rgba(17,17,17,0.65)",
-    marginBottom: 6,
-  },
-
-  value: {
-    fontSize: 16,
-    fontWeight: 600,
-    color: "#111",
-    lineHeight: 1.4,
-  },
-
-  valueBox: {
-    whiteSpace: "pre-wrap",
-    lineHeight: 1.5,
-    background: "#fff",
-    borderRadius: 12,
-    padding: 12,
-    border: "1px solid rgba(0,0,0,0.10)",
-    color: "#111",
-  },
-
-  summaryBox: {
-    whiteSpace: "pre-wrap",
-    lineHeight: 1.5,
-    background: "#fff",
-    borderRadius: 12,
-    padding: 12,
-    border: "1px solid rgba(0,0,0,0.10)",
-    color: "#111",
-    maxWidth: "100%",
-  },
-
-  cardTopRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
-    flexWrap: "wrap",
-    marginBottom: 12,
-  },
-
-  buttonRow: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-
-  metaRow: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-    marginBottom: 12,
-  },
-
-  metaPill: {
-    padding: "6px 10px",
-    borderRadius: 999,
-    border: "1px solid rgba(0,0,0,0.12)",
-    background: "#f3f4f6",
-    fontSize: 12,
-    color: "#111",
-  },
-
-  overviewTextarea: {
-    width: "100%",
-    minHeight: 72,
-    padding: "12px",
-    borderRadius: 12,
-    border: "1px solid rgba(0,0,0,0.14)",
-    background: "#fff",
-    color: "#111",
-    outline: "none",
-    resize: "vertical",
-    fontSize: 14,
-    lineHeight: 1.45,
-    marginBottom: 12,
-  },
-
-  emptyBox: {
-    padding: 12,
-    borderRadius: 12,
-    border: "1px solid rgba(0,0,0,0.10)",
-    background: "#fff",
-    color: "rgba(17,17,17,0.65)",
-  },
-
-  tableWrap: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-  },
-
-  tableHeader: {
-    display: "grid",
-    gridTemplateColumns: "70px minmax(0, 1fr) 100px 96px",
-    gap: 10,
-    fontSize: 12,
-    color: "rgba(17,17,17,0.62)",
-    padding: "0 4px",
-    alignItems: "center",
-  },
-
-  tableRow: {
-    display: "grid",
-    gridTemplateColumns: "70px minmax(0, 1fr) 100px 96px",
-    gap: 10,
-    alignItems: "center",
-    padding: 10,
-    borderRadius: 12,
-    border: "1px solid rgba(0,0,0,0.10)",
-    background: "#fff",
-  },
-
-  doneCell: {
-    display: "flex",
-    justifyContent: "center",
-  },
-
-  taskInput: {
-    width: "100%",
-    minWidth: 0,
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid rgba(0,0,0,0.14)",
-    background: "#fff",
-    color: "#111",
-    outline: "none",
-    fontSize: 14,
-  },
-
-  taskInputDone: {
-    textDecoration: "line-through",
-    opacity: 0.6,
-  },
-
-  minutesInput: {
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid rgba(0,0,0,0.14)",
-    background: "#fff",
-    color: "#111",
-    outline: "none",
-    fontSize: 14,
-  },
-
-  removeBtn: {
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid rgba(0,0,0,0.12)",
-    background: "#fff",
-    color: "#111",
-    cursor: "pointer",
-    fontSize: 13,
-  },
-
-  secondaryBtn: {
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(0,0,0,0.12)",
-    background: "#fff",
-    cursor: "pointer",
-    color: "#111",
-  },
-
-  primaryBtn: {
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "1px solid rgba(0,0,0,0.12)",
-    background: "#f3f4f6",
-    cursor: "pointer",
-    fontWeight: 600,
-    color: "#111",
-  },
-
-  disabledBtn: {
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "1px solid rgba(0,0,0,0.10)",
-    background: "#f3f4f6",
-    opacity: 0.5,
-    cursor: "not-allowed",
-    fontWeight: 600,
-    color: "#111",
-  },
-
-  error: {
-    marginBottom: 12,
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,80,80,0.35)",
-    background: "rgba(255,80,80,0.10)",
-    color: "#111",
-  },
-
-  errorInline: {
-    marginBottom: 12,
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,80,80,0.35)",
-    background: "rgba(255,80,80,0.10)",
-    color: "#111",
-  },
-};
