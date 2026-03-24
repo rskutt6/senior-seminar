@@ -1,8 +1,11 @@
-import { Injectable } from '@nestjs/common';
+// pdf.service.ts
+import fs from 'fs';
+const pdf = require('pdf-parse');
 
-@Injectable()
-export class AppService {
-  getHello(): string {
-    return 'Hello World!';
+export class PdfService {
+  async parseFromFile(filename: string) {
+    const dataBuffer = fs.readFileSync(filename);
+    const data = await pdf(dataBuffer);
+    return data.text; // this is the plain text extracted
   }
 }
