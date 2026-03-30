@@ -107,11 +107,13 @@ export default function InputAssignmentsPage() {
         body: JSON.stringify({ description: description.trim() }),
       });
 
-      const extracted = (await extractRes.json().catch(() => ({}))) as Partial<ExtractionResult>;
+      const extracted =
+        (await extractRes.json().catch(() => ({}))) as Partial<ExtractionResult>;
 
       if (!extractRes.ok) {
         throw new Error(
-          (extracted as any)?.error || "Failed to detect assignment details."
+          (extracted as { error?: string })?.error ||
+            "Failed to detect assignment details."
         );
       }
 
@@ -122,7 +124,14 @@ export default function InputAssignmentsPage() {
           ? extracted.title.trim()
           : "Untitled Assignment";
 
-      const body: any = {
+      const body: {
+        title: string;
+        description: string;
+        userId: number;
+        courseId: number | null;
+        weight?: number;
+        dueAt?: string;
+      } = {
         title,
         description: description.trim(),
         userId,
@@ -152,7 +161,10 @@ export default function InputAssignmentsPage() {
       const created = (await res.json().catch(() => ({}))) as CreatedAssignment;
 
       if (!res.ok) {
-        throw new Error((created as any)?.message || "Failed to create assignment.");
+        throw new Error(
+          (created as { message?: string })?.message ||
+            "Failed to create assignment."
+        );
       }
 
       if (!created?.id) {
@@ -164,64 +176,63 @@ export default function InputAssignmentsPage() {
           String(created.id)
         )}&userId=${encodeURIComponent(String(created.userId ?? userId))}`
       );
-    } catch (e: any) {
-      setError(e.message || "Failed to create assignment");
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : "Failed to create assignment";
+      setError(message);
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <main className="w-full px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-4xl">
-        <header className="mb-6">
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
-            Paste assignment
-          </h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Paste the full assignment description and we’ll detect the important
-            details for you.
+    <div className="w-full">
+      <form
+        onSubmit={handleSubmit}
+        className="flex min-h-[calc(100vh-140px)] flex-col rounded-3xl border border-slate-200 bg-white shadow-sm"
+      >
+        <div className="border-b border-slate-100 px-6 py-6">
+  <div className="max-w-xl space-y-2">
+    <h1 className="text-2xl font-semibold text-slate-900">
+      Paste assignment
+    </h1>
+
+    <p className="text-sm text-slate-600 leading-relaxed whitespace-normal break-words">
+      Paste the full assignment text from Canvas, email, or your syllabus. We’ll detect the important details and let you review them on the next page.
+    </p>
+  </div>
+</div>
+
+        <div className="flex-1 px-8 py-4">
+          <textarea
+            id="assignment-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Paste the full assignment instructions here..."
+            className="h-full min-h-[420px] w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100"
+          />
+
+          <p className="mt-3 text-xs text-slate-500">
+            Include the full text so the AI can catch due dates, weight, formatting rules, and submission details.
           </p>
-        </header>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <label
-                htmlFor="assignment-description"
-                className="text-sm font-medium text-slate-800"
-              >
-                Assignment description
-              </label>
-
-              <textarea
-                id="assignment-description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Paste the full assignment instructions here..."
-                rows={16}
-                className="min-h-[320px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-              />
+          {error ? (
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
             </div>
-
-            {error ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
-              </div>
-            ) : null}
-
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={!canSubmit}
-                className="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                {submitting ? "Detecting and saving..." : "Submit"}
-              </button>
-            </div>
-          </form>
+          ) : null}
         </div>
-      </div>
-    </main>
+
+        <div className="flex items-center justify-end border-t border-slate-100 px-8 py-5">
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {submitting ? "Detecting..." : "Continue"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
