@@ -323,6 +323,19 @@ export default function InputAssignmentSuccessPage() {
       }
 
       setAssignment(data as Assignment);
+
+if (!data.courseId && courses.length > 0) {
+  const match = courses.find((c) =>
+    c.name.toLowerCase().includes((data.title || "").toLowerCase())
+  );
+
+  if (match) {
+    setAssignment({
+      ...data,
+      courseId: match.id,
+    } as Assignment);
+  }
+}
       setSaveMessage("Changes saved.");
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to save changes";
@@ -522,17 +535,21 @@ export default function InputAssignmentSuccessPage() {
                   </div>
 
                   <select
-                    value={selectedCourseId}
-                    onChange={(e) => setSelectedCourseId(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                  >
-                    <option value="">Select a class</option>
-                    {courses.map((course) => (
-                      <option key={course.id} value={course.id}>
-                        {course.name}
-                      </option>
-                    ))}
-                  </select>
+  value={assignment.courseId ?? ""}
+  onChange={(e) =>
+    setAssignment({
+      ...assignment,
+      courseId: Number(e.target.value),
+    })
+  }
+>
+  <option value="">Select a class</option>
+  {courses.map((course) => (
+    <option key={course.id} value={course.id}>
+      {course.name}
+    </option>
+  ))}
+</select>
 
                   {showCreateCourse ? (
                     <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">

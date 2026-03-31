@@ -31,8 +31,15 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
+
     const description =
       typeof body?.description === "string" ? body.description.trim() : "";
+
+    const classes = Array.isArray(body?.classes)
+      ? body.classes
+          .map((c: unknown) => String(c).trim())
+          .filter(Boolean)
+      : [];
 
     if (!description) {
       return NextResponse.json(
@@ -54,12 +61,21 @@ Return ONLY valid JSON in exactly this shape:
   "summaryHint": "string"
 }
 
+User's existing classes:
+${classes.length ? classes.map((c) => `- ${c}`).join("\n") : "- none provided"}
+
 Rules:
 - title: assignment title if clearly present, otherwise null
-- courseName: course/class name if clearly present, otherwise null
-- dueAt: use an ISO-style datetime string if clearly present, otherwise null
-- if not ISO-style, find the month and day and convert into ISO-style
-- if there is no time, you may use 23:59:00
+- courseName:
+  - courseName: MUST be one of these EXACT values:
+${classes.join(", ")}
+- pick the closest match from this list
+- NEVER return null
+- dueAt:
+  - return an ISO datetime string if clearly present
+  - understand dates like "April 1", "Apr 1", "4/1", "4/1/26", "March 25, 2026 at 11:59 PM"
+  - if year is missing, infer the nearest upcoming reasonable date
+  - if time is missing, use 23:59:00
 - weight: numeric percent only, like 20 for 20%
 - summaryHint: one short sentence
 - do not include any explanation outside the JSON

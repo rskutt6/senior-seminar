@@ -101,11 +101,28 @@ export default function InputAssignmentsPage() {
         return;
       }
 
-      const extractRes = await fetch("/api/extract-assignment-details", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: description.trim() }),
-      });
+      const coursesRes = await fetch(`http://localhost:4000/courses?userId=${userId}`, {
+  cache: "no-store",
+});
+
+const existingCourses = coursesRes.ok
+  ? ((await coursesRes.json()) as Course[])
+  : [];
+
+const classNames = Array.isArray(existingCourses)
+  ? existingCourses
+      .map((course) => course.name?.trim())
+      .filter((name): name is string => !!name)
+  : [];
+
+const extractRes = await fetch("/api/extract-assignment-details", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    description: description.trim(),
+    classes: classNames,
+  }),
+});
 
       const extracted =
         (await extractRes.json().catch(() => ({}))) as Partial<ExtractionResult>;
@@ -118,6 +135,7 @@ export default function InputAssignmentsPage() {
       }
 
       const courseId = await findOrCreateCourse(userId, extracted.courseName ?? null);
+console.log("EXTRACTED COURSE: ", extracted.courseName);
 
       const title =
         typeof extracted.title === "string" && extracted.title.trim()
