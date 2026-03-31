@@ -1,6 +1,7 @@
 import { Inject, Injectable, BadRequestException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
+import { UpdateAssignmentDto } from './dto/update-assignment.dto';
 
 @Injectable()
 export class AssignmentsService {
@@ -67,7 +68,81 @@ export class AssignmentsService {
     return rows[0];
   }
 
+  async update(assignmentId: number, userId: number, dto: UpdateAssignmentDto) {
+    if (assignmentId == null || Number.isNaN(assignmentId)) {
+      throw new BadRequestException('valid assignmentId required');
+    }
+
+    if (userId == null || Number.isNaN(userId)) {
+      throw new BadRequestException('valid userId required');
+    }
+
+    const existing = await this.getOneForUser(assignmentId, userId);
+
+    if (!existing) {
+      throw new BadRequestException('assignment not found');
+    }
+
+    const title =
+      typeof dto.title === 'string' ? dto.title.trim() : existing.title ?? '';
+
+    const description =
+      typeof dto.description === 'string'
+        ? dto.description.trim()
+        : existing.description ?? '';
+
+    if (!title) {
+      throw new BadRequestException('title required');
+    }
+
+    if (!description) {
+      throw new BadRequestException('description required');
+    }
+
+    const weight =
+      dto.weight === undefined ? existing.weight : dto.weight ?? null;
+
+    const dueAt =
+      dto.dueAt === undefined
+        ? existing.dueAt
+        : dto.dueAt
+        ? new Date(dto.dueAt)
+        : null;
+
+    const courseId =
+      dto.courseId === undefined ? existing.courseId : dto.courseId ?? null;
+
+    const { rows } = await this.pool.query(
+      `
+      UPDATE public."Assignment"
+      SET
+        title = $1,
+        description = $2,
+        weight = $3,
+        "dueAt" = $4,
+        "courseId" = $5,
+        "updatedAt" = NOW()
+      WHERE id = $6 AND "userId" = $7
+      RETURNING
+        id,
+        title,
+        description,
+        weight,
+        "dueAt",
+        "userId",
+        "courseId";
+      `,
+      [title, description, weight, dueAt, courseId, assignmentId, userId],
+    );
+
+    return rows[0];
+  }
+
   async listForUser(userId: number) {
+    if (userId == null || Number.isNaN(userId)) {
+      throw new BadRequestException('valid userId required');
+    }
+
     const { rows } = await this.pool.query(
       `
       SELECT
@@ -89,6 +164,14 @@ export class AssignmentsService {
   }
 
   async getOneForUser(assignmentId: number, userId: number) {
+    if (assignmentId == null || Number.isNaN(assignmentId)) {
+      throw new BadRequestException('valid assignmentId required');
+    }
+
+    if (userId == null || Number.isNaN(userId)) {
+      throw new BadRequestException('valid userId required');
+    }
+
     const { rows } = await this.pool.query(
       `
       SELECT
@@ -110,6 +193,14 @@ export class AssignmentsService {
   }
 
   async delete(assignmentId: number, userId: number) {
+    if (assignmentId == null || Number.isNaN(assignmentId)) {
+      throw new BadRequestException('valid assignmentId required');
+    }
+
+    if (userId == null || Number.isNaN(userId)) {
+      throw new BadRequestException('valid userId required');
+    }
+
     await this.pool.query(
       `
       DELETE FROM public."Assignment"

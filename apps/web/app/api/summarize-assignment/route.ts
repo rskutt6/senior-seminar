@@ -1,44 +1,46 @@
-import OpenAI from 'openai';
+import OpenAI from "openai";
 
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      return Response.json(
-        { message: 'OPENAI_API_KEY not set' },
-        { status: 500 },
+    const { title, description } = await req.json();
+
+    if (!description || !description.trim()) {
+      return new Response(
+        JSON.stringify({ error: "Missing description" }),
+        { status: 400 }
       );
     }
 
-    const { description } = await req.json();
-    if (!description || typeof description !== 'string') {
-      return Response.json({ message: 'Missing description' }, { status: 400 });
-    }
+    const response = await openai.responses.create({
+      model: "gpt-4o-mini",
+      input: `You are summarizing a student assignment.
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+Return a clear, concise summary in 3-5 bullet points.
 
-    const resp = await openai.responses.create({
-      model: 'gpt-4o-mini',
-      temperature: 0.2,
-      instructions: [
-        'You help students understand assignments.',
-        'Write a clear summary in 1–3 sentences.',
-        'Explain the goal of the assignment and the main tasks the student must complete.',
-        'Do not use bullet points or formatting.',
-        'Don t restate every formatting detail.',
-        'Focus only on the main task, required work, and the most important submission requirement'
+Assignment title: ${title || "Untitled Assignment"}
 
-      ].join(' '),
-      input: description,
+Assignment description:
+${description}`,
     });
 
-    const summary = resp.output_text?.trim() || '';
-    return Response.json({ summary });
-  } catch (err: any) {
-    return Response.json(
-      { message: err?.message || 'Summarization failed' },
-      { status: 500 },
+    return new Response(
+      JSON.stringify({
+        summary: response.output_text,
+      }),
+      { status: 200 }
+    );
+  } catch (err) {
+    console.error("Summarize route error:", err);
+
+    return new Response(
+      JSON.stringify({ error: "Failed to summarize assignment" }),
+      { status: 500 }
     );
   }
 }
