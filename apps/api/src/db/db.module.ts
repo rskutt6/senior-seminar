@@ -13,7 +13,7 @@ export const PG_POOL = "PG_POOL";
 
         return new Pool({
           connectionString,
-          ssl: { rejectUnauthorized: false },
+          ssl: process.env.DATABASE_URL?.includes('localhost') ? false : { rejectUnauthorized: false },
         });
       },
     },
