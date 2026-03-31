@@ -1,9 +1,5 @@
 jest.mock('fs', () => ({ readFileSync: jest.fn() }));
-jest.mock('pdf-parse', () => ({
-  PDFParse: jest.fn().mockImplementation(() => ({
-    parse: jest.fn().mockResolvedValue({ text: 'mocked pdf text' }),
-  })),
-}));
+jest.mock('pdf-parse', () => jest.fn().mockResolvedValue({ text: 'mocked pdf text' }));
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { PdfService } from './pdf.service';
@@ -40,6 +36,19 @@ describe('PdfService', () => {
         throw new Error('ENOENT: no such file');
       });
       await expect(service.parseFromFile('missing.pdf')).rejects.toThrow('ENOENT');
+    });
+  });
+
+  describe('parseFromBuffer', () => {
+    it('returns extracted text from a buffer', async () => {
+      const result = await service.parseFromBuffer(Buffer.from('fake'));
+      expect(result).toBe('mocked pdf text');
+    });
+
+    it('throws when pdfParse fails', async () => {
+      const pdfParse = require('pdf-parse');
+      (pdfParse as jest.Mock).mockRejectedValueOnce(new Error('parse error'));
+      await expect(service.parseFromBuffer(Buffer.from('bad'))).rejects.toThrow('parse error');
     });
   });
 });
