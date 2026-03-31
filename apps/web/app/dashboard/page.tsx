@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import WeekGrid from './_components/WeekGrid';
@@ -10,8 +11,6 @@ export default function DashboardPage() {
   useEffect(() => {
     const user = localStorage.getItem('user');
 
-    // If no user is logged in, send back to your entry route
-    // (Change '/' to '/login' if that's your real login route)
     if (!user) {
       router.push('/');
     }
@@ -53,6 +52,18 @@ export default function DashboardPage() {
         </div>
 
         <section style={panel}>
+          <div style={quickLinksRow}>
+            <Link href="/dashboard/assignments" style={linkCard}>
+              <div style={linkTitle}>Assignments</div>
+              <div style={linkText}>View and manage all assignments</div>
+            </Link>
+
+            <Link href="/dashboard/input-assignments" style={linkCard}>
+              <div style={linkTitle}>Add assignment</div>
+              <div style={linkText}>Paste in a new assignment</div>
+            </Link>
+          </div>
+
           <WeekGrid days={week.days} />
         </section>
       </div>
@@ -109,6 +120,34 @@ const panel: React.CSSProperties = {
   border: '1px solid rgba(0,0,0,0.08)',
   padding: 16,
   background: 'white',
+};
+
+const quickLinksRow: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 12,
+  marginBottom: 16,
+};
+
+const linkCard: React.CSSProperties = {
+  display: 'block',
+  textDecoration: 'none',
+  border: '1px solid rgba(0,0,0,0.08)',
+  borderRadius: 14,
+  padding: 14,
+  background: '#f8fafc',
+  color: '#111',
+};
+
+const linkTitle: React.CSSProperties = {
+  fontSize: 16,
+  fontWeight: 800,
+  marginBottom: 4,
+};
+
+const linkText: React.CSSProperties = {
+  fontSize: 14,
+  color: 'rgba(17,17,17,0.7)',
 };
 
 const secondaryBtn: React.CSSProperties = {
