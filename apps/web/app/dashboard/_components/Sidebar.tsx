@@ -16,6 +16,15 @@ export default function Sidebar() {
         <Link href="/dashboard" style={styles.link}>
           Dashboard
         </Link>
+        <Link href="/dashboard/calendar" style={styles.link}>
+          Calendar
+        </Link>
+        <Link href="/dashboard/audio-library" style={styles.link}>
+          Audio Library
+        </Link>
+        <Link href="/dashboard/input-assignments" style={styles.link}>
+          Import Assignments
+        </Link>
         <Link href="/dashboard/settings" style={styles.link}>
           Settings
         </Link>
