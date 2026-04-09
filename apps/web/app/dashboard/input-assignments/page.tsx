@@ -11,6 +11,14 @@ type CreatedAssignment = {
   dueAt: string | null;
   userId: number;
   courseId: number | null;
+  assignmentType: string | null;
+  problemCount: number | null;
+  pageCount: number | null;
+  summary: string | null;
+  checklist: unknown;
+  priority: string | null;
+  status: string | null;
+  notes: string | null;
 };
 
 type ExtractionResult = {
@@ -18,7 +26,10 @@ type ExtractionResult = {
   courseName: string | null;
   dueAt: string | null;
   weight: number | null;
-  summaryHint: string;
+  assignmentType: string | null;
+  problemCount: number | null;
+  pageCount: number | null;
+  summary: string;
 };
 
 type Course = {
@@ -27,6 +38,19 @@ type Course = {
   userId: number;
   createdAt: string;
 };
+
+const ASSIGNMENT_TYPES = [
+  "homework",
+  "essay",
+  "reading",
+  "project",
+  "discussion",
+  "exam",
+  "quiz",
+  "lab",
+  "presentation",
+  "other",
+] as const;
 
 export default function InputAssignmentsPage() {
   const router = useRouter();
@@ -102,27 +126,28 @@ export default function InputAssignmentsPage() {
       }
 
       const coursesRes = await fetch(`http://localhost:4000/courses?userId=${userId}`, {
-  cache: "no-store",
-});
+        cache: "no-store",
+      });
 
-const existingCourses = coursesRes.ok
-  ? ((await coursesRes.json()) as Course[])
-  : [];
+      const existingCourses = coursesRes.ok
+        ? ((await coursesRes.json()) as Course[])
+        : [];
 
-const classNames = Array.isArray(existingCourses)
-  ? existingCourses
-      .map((course) => course.name?.trim())
-      .filter((name): name is string => !!name)
-  : [];
+      const classNames = Array.isArray(existingCourses)
+        ? existingCourses
+            .map((course) => course.name?.trim())
+            .filter((name): name is string => !!name)
+        : [];
 
-const extractRes = await fetch("/api/extract-assignment-details", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    description: description.trim(),
-    classes: classNames,
-  }),
-});
+      const extractRes = await fetch("/api/extract-assignment-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description: description.trim(),
+          classes: classNames,
+          assignmentTypes: ASSIGNMENT_TYPES,
+        }),
+      });
 
       const extracted =
         (await extractRes.json().catch(() => ({}))) as Partial<ExtractionResult>;
@@ -135,7 +160,6 @@ const extractRes = await fetch("/api/extract-assignment-details", {
       }
 
       const courseId = await findOrCreateCourse(userId, extracted.courseName ?? null);
-console.log("EXTRACTED COURSE: ", extracted.courseName);
 
       const title =
         typeof extracted.title === "string" && extracted.title.trim()
@@ -149,11 +173,47 @@ console.log("EXTRACTED COURSE: ", extracted.courseName);
         courseId: number | null;
         weight?: number;
         dueAt?: string;
+        assignmentType: string | null;
+        problemCount: number | null;
+        pageCount: number | null;
+        summary: string | null;
+        checklist: {
+          id: string;
+          step: string;
+          minutes: number;
+          checked: boolean;
+        }[];
+        priority: string;
+        status: string;
+        notes: string;
       } = {
         title,
         description: description.trim(),
         userId,
         courseId: courseId ?? null,
+        assignmentType:
+          typeof extracted.assignmentType === "string" &&
+          extracted.assignmentType.trim()
+            ? extracted.assignmentType.trim()
+            : null,
+        problemCount:
+          typeof extracted.problemCount === "number" &&
+          Number.isFinite(extracted.problemCount)
+            ? extracted.problemCount
+            : null,
+        pageCount:
+          typeof extracted.pageCount === "number" &&
+          Number.isFinite(extracted.pageCount)
+            ? extracted.pageCount
+            : null,
+        summary:
+          typeof extracted.summary === "string" && extracted.summary.trim()
+            ? extracted.summary.trim()
+            : null,
+        checklist: [],
+        priority: "medium",
+        status: "not_started",
+        notes: "",
       };
 
       if (
@@ -210,16 +270,18 @@ console.log("EXTRACTED COURSE: ", extracted.courseName);
         className="flex min-h-[calc(100vh-140px)] flex-col rounded-3xl border border-slate-200 bg-white shadow-sm"
       >
         <div className="border-b border-slate-100 px-6 py-6">
-  <div className="max-w-xl space-y-2">
-    <h1 className="text-2xl font-semibold text-slate-900">
-      Paste assignment
-    </h1>
+          <div className="max-w-xl space-y-2">
+            <h1 className="text-2xl font-semibold text-slate-900">
+              Paste assignment
+            </h1>
 
-    <p className="text-sm text-slate-600 leading-relaxed whitespace-normal break-words">
-      Paste the full assignment text from Canvas, email, or your syllabus. We’ll detect the important details and let you review them on the next page.
-    </p>
-  </div>
-</div>
+            <p className="break-words whitespace-normal text-sm leading-relaxed text-slate-600">
+              Paste the full assignment text from Canvas, email, or your syllabus.
+              We’ll detect the important details and let you review them on the
+              next page.
+            </p>
+          </div>
+        </div>
 
         <div className="flex-1 px-8 py-4">
           <textarea
@@ -231,7 +293,8 @@ console.log("EXTRACTED COURSE: ", extracted.courseName);
           />
 
           <p className="mt-3 text-xs text-slate-500">
-            Include the full text so the AI can catch due dates, weight, formatting rules, and submission details.
+            Include the full text so the AI can catch due dates, weight, class,
+            assignment type, and workload details.
           </p>
 
           {error ? (
