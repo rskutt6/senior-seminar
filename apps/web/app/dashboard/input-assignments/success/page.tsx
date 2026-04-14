@@ -34,7 +34,13 @@ type Assignment = {
   problemCount?: number | null;
   pageCount?: number | null;
 
-  summary?: string | null;
+  "summary": {
+  "focus": "string",
+  "content": "string",
+  "sources": "string",
+  "structure": "string",
+  "formatting": "string"
+}
   checklistOverview?: string | null;
   checklistItems?: string | EditableChecklistItem[] | null;
 
@@ -595,7 +601,7 @@ export default function InputAssignmentSuccessPage() {
         notes: notes.trim() || null,
         summary: summaryPayload,
         checklistOverview: checklistOverview.trim() || null,
-        checklistItems,
+        checklistItems: JSON.stringify(checklistItems),
       };
 
       const res = await fetch(
