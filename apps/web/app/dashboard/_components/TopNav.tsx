@@ -1,40 +1,56 @@
 import Link from "next/link";
+import Image from "next/image";
+
 const tabs = [
+  { label: "Dashboard", href: "/dashboard" },
   { label: "Calendar", href: "/dashboard/calendar" },
   { label: "Audio Library", href: "/dashboard/audio-library" },
   { label: "Input Assignments", href: "/dashboard/input-assignments" },
+  { label: "Settings", href: "/dashboard/settings" },
+  { label: "Logout →", href: "/logout" },
 ];
+
 export default function TopNav() {
   return (
     <header style={styles.header} aria-label="Top navigation">
-      <div style={styles.row}>
+      <Image
+        src="/FocusFlow_Logo.png"
+        alt="FocusFlow Logo"
+        width={60}
+        height={60}
+        style={{ objectFit: "contain" }}
+      />
+      <nav style={styles.row}>
         {tabs.map((t) => (
           <Link key={t.href} href={t.href} style={styles.tab}>
             {t.label}
           </Link>
         ))}
-      </div>
+      </nav>
     </header>
   );
 }
+
 const styles: Record<string, React.CSSProperties> = {
   header: {
     borderBottom: "1px solid #9CAF88",
-    padding: 16,
+    padding: "12px 24px",
     background: "#ffffff",
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
   },
   row: {
     display: "flex",
-    gap: 10,
-    flexWrap: "wrap",
+    flex: 1,
+    justifyContent: "space-evenly",
   },
   tab: {
-    padding: "12px 14px",
-    borderRadius: 12,
-    border: "1px solid #7FA7B5",
     textDecoration: "none",
-    fontWeight: 900,
+    fontWeight: 700,
+    fontSize: 18,
     color: "#6E7F5B",
-    background: "#F4F1EC",
+    border: "none",
+    background: "transparent",
   },
 };
