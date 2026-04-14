@@ -98,27 +98,36 @@ export default function CreateAudioPage() {
       setLoading(true);
       setTtsState("generating");
 
+      const title =
+        mode === "pdf"
+          ? fileName.replace(/\.pdf$/i, "") || "PDF audio"
+          : pastedText.trim().slice(0, 40) || "Pasted text audio";
+
       const res = await fetch("http://localhost:4000/audio/text-to-speech", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text: activeText }),
+        body: JSON.stringify({
+          text: activeText,
+          title,
+          sourceType: mode,
+          sourceName: mode === "pdf" ? fileName : "Pasted text",
+        }),
       });
 
-      if (!res.ok) {
-        let message = "Failed to generate audio";
-        try {
-          const data = await res.json();
-          message = data?.message || message;
-        } catch {}
-        throw new Error(message);
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
       }
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      if (!res.ok) {
+        throw new Error(data?.message || "Failed to generate audio");
+      }
 
-      setAudioUrl(url);
+      setAudioUrl(data.audioUrl);
       setTtsState("done");
     } catch (err: any) {
       setError(err.message || "Failed to generate audio");
