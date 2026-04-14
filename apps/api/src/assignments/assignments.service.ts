@@ -25,44 +25,37 @@ export class AssignmentsService {
     }
 
     const query = `
-    INSERT INTO public."Assignment" (
-      title,
-      description,
-      weight,
-      "dueAt",
-      "userId",
-      "courseId",
-      "createdAt",
-      "updatedAt"
-    )
-    VALUES (
-      $1,
-      $2,
-      $3,
-      $4,
-      $5,
-      $6,
-      NOW(),
-      NOW()
-    )
-    RETURNING
-      id,
-      title,
-      description,
-      weight,
-      "dueAt",
-      "userId",
-      "courseId";
-  `;
+UPDATE public."Assignment"
+SET
+  title = $1,
+  description = $2,
+  weight = $3,
+  "dueAt" = $4,
+  "courseId" = $5,
+  "assignmentType" = $6,
+  "summary" = $7,
+  "priority" = $8,
+  "status" = $9,
+  "checklistItems" = $10,
+  "updatedAt" = NOW()
+WHERE id = $11 AND "userId" = $12
+RETURNING *;
+`;
 
-    const values = [
-      title,
-      description,
-      dto.weight ?? null,
-      dto.dueAt ? new Date(dto.dueAt) : null,
-      dto.userId,
-      dto.courseId ?? null,
-    ];
+const values = [
+  dto.title,
+  dto.description,
+  dto.weight,
+  dto.dueAt,
+  dto.courseId,
+  dto.assignmentType,
+  dto.summary,
+  dto.priority,
+  dto.status,
+  JSON.stringify(dto.checklistItems || []),
+  id,
+  userId,
+];
 
     const { rows } = await this.pool.query(query, values);
     return rows[0];

@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -11,42 +10,22 @@ export async function POST(req: Request) {
   try {
     const { title, description } = await req.json();
 
-    if (!description) {
-      return NextResponse.json({ error: "Missing description" }, { status: 400 });
-    }
-
     const prompt = `
-Extract assignment details.
-
-Return ONLY valid JSON:
+Analyze this assignment and return JSON:
 
 {
-  "summary": "string",
-  "type": "homework | exam | project | quiz | other",
+  "summary": "bullet points",
+  "assignmentType": "Homework | Exam | Quiz | Project | Essay | Other",
   "priority": "high | medium | low",
   "status": "not_started | in_progress | completed",
   "problemCount": number | null,
-  "pageCount": number | null,
-  "notes": "string"
+  "pageCount": number | null
 }
 
 Rules:
-- priority:
-  - high → exams, big projects, near deadlines
-  - medium → normal assignments
-  - low → small tasks
-
-- status:
-  - default "not_started"
-
-- type:
-  - exam → test/midterm/final
-  - project → long/multi-step
-  - quiz → short
-  - homework → normal
-  - paper
-  - lab
-  - other → fallback
+- priority = high if soon or heavy
+- status = always "not_started"
+- detect pages/problems if mentioned
 `;
 
     const response = await openai.responses.create({
@@ -54,20 +33,16 @@ Rules:
       input: `${title}\n\n${description}\n\n${prompt}`,
     });
 
-    const text = response.output_text || "{}";
+    const parsed = JSON.parse(response.output_text || "{}");
 
-    const parsed = JSON.parse(text);
-
-    return NextResponse.json({
-      summary: parsed.summary ?? "",
-      type: parsed.type ?? "homework",
-      priority: parsed.priority ?? "medium",
-      status: parsed.status ?? "not_started",
-      problemCount: parsed.problemCount ?? null,
-      pageCount: parsed.pageCount ?? null,
-      notes: parsed.notes ?? "",
-    });
-  } catch (e) {
-    return NextResponse.json({ error: "Failed to summarize" }, { status: 500 });
+    return new Response(
+      JSON.stringify(parsed),
+      { status: 200 }
+    );
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "Failed" }),
+      { status: 500 }
+    );
   }
 }
