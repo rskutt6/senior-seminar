@@ -9,12 +9,11 @@ const openai = new OpenAI({
 
 function extractJsonObject(text: string) {
   const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-
   const firstBrace = cleaned.indexOf("{");
   const lastBrace = cleaned.lastIndexOf("}");
 
   if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
-    throw new Error("No JSON object found in model response.");
+    throw new Error("No JSON object found");
   }
 
   return cleaned.slice(firstBrace, lastBrace + 1);
@@ -22,99 +21,78 @@ function extractJsonObject(text: string) {
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      console.error("extract-assignment-details: OPENAI_API_KEY is missing");
-      return NextResponse.json(
-        { error: "OPENAI_API_KEY not set." },
-        { status: 500 }
-      );
-    }
-
     const body = await req.json();
 
     const description =
       typeof body?.description === "string" ? body.description.trim() : "";
 
     const classes = Array.isArray(body?.classes)
-      ? body.classes
-          .map((c: unknown) => String(c).trim())
-          .filter(Boolean)
+      ? body.classes.map((c: unknown) => String(c).trim()).filter(Boolean)
+      : [];
+
+    const assignmentTypes = Array.isArray(body?.assignmentTypes)
+      ? body.assignmentTypes.map((c: unknown) => String(c).trim()).filter(Boolean)
       : [];
 
     if (!description) {
-      return NextResponse.json(
-        { error: "Assignment description is required." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing description" }, { status: 400 });
     }
 
     const response = await openai.responses.create({
       model: "gpt-4o-mini",
-      input: `Extract assignment details from the text below.
+      input: `Extract assignment details.
 
-Return ONLY valid JSON in exactly this shape:
+Return ONLY valid JSON:
 {
   "title": "string | null",
   "courseName": "string | null",
   "dueAt": "string | null",
   "weight": number | null,
-  "summaryHint": "string"
+  "assignmentType": "string | null",
+  "problemCount": number | null",
+  "pageCount": number | null,
+  "priority": "string | null",
+  "status": "string | null",
+  "notes": "string | null",
+  "summary": "string | null"
 }
 
-User's existing classes:
-${classes.length ? classes.map((c) => `- ${c}`).join("\n") : "- none provided"}
+Rules:
+- courseName MUST match the closest existing class from this list when possible:
+${classes.length ? classes.join(", ") : "none"}
+
+- assignmentType MUST be one of:
+homework, essay, reading, project, discussion, exam, quiz, lab, presentation, other
 
 Rules:
-- title: assignment title if clearly present, otherwise null
-- courseName:
-  - courseName: MUST be one of these EXACT values:
-${classes.join(", ")}
-- pick the closest match from this list
+- Choose the BEST match based on description
+- If unsure → default to "homework"
 - NEVER return null
-- dueAt:
-  - return an ISO datetime string if clearly present
-  - understand dates like "April 1", "Apr 1", "4/1", "4/1/26", "March 25, 2026 at 11:59 PM"
-  - if year is missing, infer the nearest upcoming reasonable date
-  - if time is missing, use 23:59:00
-- weight: numeric percent only, like 20 for 20%
-- summaryHint: one short sentence
-- do not include any explanation outside the JSON
 
-Assignment description:
+- dueAt:
+  - return ISO datetime if found
+  - understand dates like April 1, Apr 1, 4/1, 4/1/26
+  - if no time, use 23:59:00
+
+- priority:
+  - high if urgent, heavy, or important
+  - medium for normal assignments
+  - low for smaller/lighter work
+
+- status:
+  - default to "not_started"
+
+- problemCount if clearly stated
+- pageCount if clearly stated
+- notes should be short extra details if useful, otherwise null
+- summary should be one short sentence
+
+Text:
 ${description}`,
     });
 
-    const rawText = response.output_text?.trim() || "";
-    console.log("extract-assignment-details raw output:", rawText);
-
-    if (!rawText) {
-      return NextResponse.json(
-        { error: "No extraction returned from OpenAI." },
-        { status: 500 }
-      );
-    }
-
-    let parsed: {
-      title?: string | null;
-      courseName?: string | null;
-      dueAt?: string | null;
-      weight?: number | null;
-      summaryHint?: string;
-    };
-
-    try {
-      const jsonText = extractJsonObject(rawText);
-      parsed = JSON.parse(jsonText);
-    } catch (parseError) {
-      console.error("Failed to parse extraction JSON:", parseError);
-      return NextResponse.json(
-        {
-          error: "Extraction returned invalid JSON.",
-          raw: rawText,
-        },
-        { status: 500 }
-      );
-    }
+    const raw = response.output_text?.trim() || "";
+    const parsed = JSON.parse(extractJsonObject(raw));
 
     return NextResponse.json({
       title:
@@ -133,16 +111,37 @@ ${description}`,
         typeof parsed.weight === "number" && Number.isFinite(parsed.weight)
           ? parsed.weight
           : null,
-      summaryHint:
-        typeof parsed.summaryHint === "string" && parsed.summaryHint.trim()
-          ? parsed.summaryHint.trim()
-          : "Parsed assignment details.",
+      assignmentType:
+        typeof parsed.assignmentType === "string" && parsed.assignmentType.trim()
+          ? parsed.assignmentType.trim().toLowerCase()
+          : null,
+      problemCount:
+        typeof parsed.problemCount === "number" && Number.isFinite(parsed.problemCount)
+          ? parsed.problemCount
+          : null,
+      pageCount:
+        typeof parsed.pageCount === "number" && Number.isFinite(parsed.pageCount)
+          ? parsed.pageCount
+          : null,
+      priority:
+        typeof parsed.priority === "string" && parsed.priority.trim()
+          ? parsed.priority.trim().toLowerCase()
+          : null,
+      status:
+        typeof parsed.status === "string" && parsed.status.trim()
+          ? parsed.status.trim().toLowerCase()
+          : "not_started",
+      notes:
+        typeof parsed.notes === "string" && parsed.notes.trim()
+          ? parsed.notes.trim()
+          : null,
+      summary:
+        typeof parsed.summary === "string" && parsed.summary.trim()
+          ? parsed.summary.trim()
+          : null,
     });
-  } catch (error) {
-    console.error("extract-assignment-details route error:", error);
-    return NextResponse.json(
-      { error: "Failed to detect assignment details." },
-      { status: 500 }
-    );
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: "failed" }, { status: 500 });
   }
 }

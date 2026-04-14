@@ -6,45 +6,51 @@ datasource db {
   provider = "postgresql"
 }
 
-/* your models below... */
+/// your models below...
 model User {
   id           Int          @id @default(autoincrement())
-
   email        String       @unique
   firstName    String
   lastName     String
   passwordHash String
   createdAt    DateTime     @default(now())
-
-  courses      Course[]
   assignments  Assignment[]
+  courses      Course[]
 }
 
 model Course {
-  id        Int      @id @default(autoincrement())
-  name      String
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-
+  id          Int          @id @default(autoincrement())
+  name        String
+  userId      Int
+  createdAt   DateTime     @default(now())
   assignments Assignment[]
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, name])
 }
 
 model Assignment {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             Int       @id @default(autoincrement())
+  userId         Int
+  courseId       Int?
+  description    String
+  weight         Float?
+  dueAt          DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  title          String?
+  assignmentType String?
+  course         Course?   @relation(fields: [courseId], references: [id])
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
 
-  courseId    Int?
-  course      Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
-
-  title       String?
-  description String
-  weight      Float?
-  dueAt       DateTime?
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model AudioReading {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  title      String
+  sourceText String
+  audioUrl   String?
+  createdAt  DateTime? @default(now()) @db.Timestamp(6)
+  sourceType String?   @default("text")
+  sourceName String?
 }

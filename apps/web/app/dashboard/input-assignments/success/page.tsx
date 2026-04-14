@@ -1,7 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+
+type Course = {
+  id: number;
+  name: string;
+  userId: number;
+  createdAt?: string;
+};
+
+type EditableChecklistItem = {
+  id: string;
+  step: string;
+  minutes: number;
+  dueDate: string;
+  checked: boolean;
+};
 
 type Assignment = {
   id: number;
@@ -11,42 +26,77 @@ type Assignment = {
   dueAt: string | null;
   userId: number;
   courseId: number | null;
+
+  assignmentType?: string | null;
+  priority?: string | null;
+  status?: string | null;
+
+  problemCount?: number | null;
+  pageCount?: number | null;
+
+  summary?: string | null;
+  checklistOverview?: string | null;
+  checklistItems?: string | EditableChecklistItem[] | null;
+
+  notes?: string | null;
 };
 
-type Course = {
-  id: number;
-  name: string;
-  userId: number;
-  createdAt: string;
+type SummarySections = {
+  focus: string;
+  content: string;
+  sources: string;
+  structure: string;
+  formatting: string;
 };
 
-type ChecklistItem = {
-  step: string;
-  minutes: number;
+type SummarizeResponse = {
+  summary?: unknown;
+  assignmentType?: string | null;
+  priority?: string | null;
+  status?: string | null;
+  problemCount?: number | null;
+  pageCount?: number | null;
+  notes?: string | null;
 };
 
-type EditableChecklistItem = {
-  id: string;
-  step: string;
-  minutes: number;
-  checked: boolean;
+type ChecklistApiItem = {
+  step?: string;
+  minutes?: number;
+  dueDate?: string;
 };
+
+type ChecklistResponse = {
+  overview?: string;
+  checklist?: ChecklistApiItem[];
+};
+
+const ASSIGNMENT_TYPE_OPTIONS = [
+  "homework",
+  "essay",
+  "reading",
+  "project",
+  "discussion",
+  "exam",
+  "quiz",
+  "lab",
+  "presentation",
+  "other",
+] as const;
+
+const PRIORITY_OPTIONS = ["high", "medium", "low"] as const;
+
+const STATUS_OPTIONS = [
+  { value: "not_started", label: "Not started" },
+  { value: "in_progress", label: "In progress" },
+  { value: "completed", label: "Completed" },
+] as const;
 
 function makeId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-function toLocalDateTimeInputValue(value: string | null) {
-  if (!value) return "";
-
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-
-  const pad = (n: number) => String(n).padStart(2, "0");
-
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-    d.getHours()
-  )}:${pad(d.getMinutes())}`;
+function isMissing(value: unknown) {
+  return value === null || value === undefined || String(value).trim() === "";
 }
 
 function RequiredLabel({
@@ -62,6 +112,173 @@ function RequiredLabel({
       {missing ? <span className="ml-1 text-red-500">*</span> : null}
     </span>
   );
+}
+
+function toLocalDateTimeInputValue(value: string | null) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
+    d.getDate()
+  )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function parseChecklistItems(raw: Assignment["checklistItems"]): EditableChecklistItem[] {
+  if (!raw) return [];
+
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.map((item) => ({
+      id: String(item?.id ?? makeId()),
+      step: String(item?.step ?? ""),
+      minutes: Number(item?.minutes ?? 0),
+      dueDate: String(item?.dueDate ?? ""),
+      checked: Boolean(item?.checked),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function generateFallbackDates(count: number, dueAtLocal: string) {
+  if (!count) return [];
+  if (!dueAtLocal) return Array.from({ length: count }, () => "");
+
+  const now = new Date();
+  const due = new Date(dueAtLocal);
+  if (Number.isNaN(due.getTime())) return Array.from({ length: count }, () => "");
+
+  const totalDays = Math.max(
+    1,
+    Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  );
+
+  return Array.from({ length: count }, (_, i) => {
+    const ratio = count === 1 ? 1 : i / (count - 1);
+    const offset = Math.max(0, Math.floor(ratio * totalDays));
+    const d = new Date(now);
+    d.setDate(now.getDate() + offset);
+    return d.toISOString().slice(0, 10);
+  });
+}
+
+function normalizeSummary(raw: unknown): SummarySections | null {
+  if (!raw) return null;
+
+  if (typeof raw === "object" && raw !== null) {
+    const obj = raw as Record<string, unknown>;
+    return {
+      focus: String(obj.focus ?? ""),
+      content: String(obj.content ?? ""),
+      sources: String(obj.sources ?? ""),
+      structure: String(obj.structure ?? ""),
+      formatting: String(obj.formatting ?? ""),
+    };
+  }
+
+  if (typeof raw !== "string") return null;
+
+  const text = raw.trim();
+  if (!text) return null;
+
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === "object") {
+      return {
+        focus: String((parsed as Record<string, unknown>).focus ?? ""),
+        content: String((parsed as Record<string, unknown>).content ?? ""),
+        sources: String((parsed as Record<string, unknown>).sources ?? ""),
+        structure: String((parsed as Record<string, unknown>).structure ?? ""),
+        formatting: String((parsed as Record<string, unknown>).formatting ?? ""),
+      };
+    }
+  } catch {
+    // keep going
+  }
+
+  const cleaned = text.replace(/\r/g, "");
+  const lines = cleaned
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const sections: SummarySections = {
+    focus: "",
+    content: "",
+    sources: "",
+    structure: "",
+    formatting: "",
+  };
+
+  const buckets: Array<keyof SummarySections> = [
+    "focus",
+    "content",
+    "sources",
+    "structure",
+    "formatting",
+  ];
+
+  for (const line of lines) {
+    const normalized = line.toLowerCase();
+
+    if (
+      normalized.includes("focus") ||
+      normalized.includes("objective") ||
+      normalized.includes("overview")
+    ) {
+      sections.focus = line.replace(/^\**[^:]+:\**\s*/i, "");
+      continue;
+    }
+
+    if (
+      normalized.includes("content") ||
+      normalized.includes("key task") ||
+      normalized.includes("requirement")
+    ) {
+      sections.content = line.replace(/^\**[^:]+:\**\s*/i, "");
+      continue;
+    }
+
+    if (
+      normalized.includes("source") ||
+      normalized.includes("research")
+    ) {
+      sections.sources = line.replace(/^\**[^:]+:\**\s*/i, "");
+      continue;
+    }
+
+    if (
+      normalized.includes("structure") ||
+      normalized.includes("outline")
+    ) {
+      sections.structure = line.replace(/^\**[^:]+:\**\s*/i, "");
+      continue;
+    }
+
+    if (
+      normalized.includes("format") ||
+      normalized.includes("submission") ||
+      normalized.includes("deadline")
+    ) {
+      sections.formatting = line.replace(/^\**[^:]+:\**\s*/i, "");
+      continue;
+    }
+  }
+
+  if (!sections.focus && lines.length) sections.focus = lines[0];
+  if (!sections.content && lines.length > 1) sections.content = lines[1];
+  if (!sections.sources && lines.length > 2) sections.sources = lines[2];
+  if (!sections.structure && lines.length > 3) sections.structure = lines[3];
+  if (!sections.formatting && lines.length > 4) sections.formatting = lines[4];
+
+  const hasAnything = buckets.some((key) => sections[key].trim());
+  return hasAnything ? sections : null;
 }
 
 export default function InputAssignmentSuccessPage() {
@@ -81,30 +298,52 @@ export default function InputAssignmentSuccessPage() {
   const [dueAtLocal, setDueAtLocal] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState("");
 
-  const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState("");
-  const [saveError, setSaveError] = useState("");
+  const [assignmentType, setAssignmentType] = useState("");
+  const [priority, setPriority] = useState("");
+  const [status, setStatus] = useState("not_started");
+  const [problemCount, setProblemCount] = useState("");
+  const [pageCount, setPageCount] = useState("");
+  const [notes, setNotes] = useState("");
 
-  const [summary, setSummary] = useState("");
+  const [summary, setSummary] = useState<SummarySections | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
 
-  const [checklistLoading, setChecklistLoading] = useState(false);
-  const [checklistError, setChecklistError] = useState("");
   const [checklistOverview, setChecklistOverview] = useState("");
   const [checklistItems, setChecklistItems] = useState<EditableChecklistItem[]>([]);
+  const [checklistLoading, setChecklistLoading] = useState(false);
+  const [checklistError, setChecklistError] = useState("");
 
   const [showCreateCourse, setShowCreateCourse] = useState(false);
   const [newCourseName, setNewCourseName] = useState("");
   const [creatingCourse, setCreatingCourse] = useState(false);
   const [courseError, setCourseError] = useState("");
 
-  const missingTitle = !title.trim();
-  const missingCourse = !selectedCourseId.trim();
-  const missingDueAt = !dueAtLocal.trim();
-  const missingWeight = !weight.trim();
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle"
+  );
+  const [saveError, setSaveError] = useState("");
+
+  const hasLoadedRef = useRef(false);
+  const isGeneratingChecklistRef = useRef(false);
+
+  const missingTitle = isMissing(title);
+  const missingCourse = isMissing(selectedCourseId);
+  const missingDueAt = isMissing(dueAtLocal);
+  const missingWeight = isMissing(weight);
+  const missingType = isMissing(assignmentType);
+  const missingPriority = isMissing(priority);
+  const missingStatus = isMissing(status);
+  const missingProblemCount = isMissing(problemCount);
+  const missingPageCount = isMissing(pageCount);
 
   const totalMinutes = useMemo(() => {
     return checklistItems.reduce((sum, item) => sum + (Number(item.minutes) || 0), 0);
+  }, [checklistItems]);
+
+  const remainingMinutes = useMemo(() => {
+    return checklistItems.reduce((sum, item) => {
+      return item.checked ? sum : sum + (Number(item.minutes) || 0);
+    }, 0);
   }, [checklistItems]);
 
   const completedCount = useMemo(() => {
@@ -170,6 +409,32 @@ export default function InputAssignmentSuccessPage() {
             ? ""
             : String(loadedAssignment.courseId)
         );
+
+        setAssignmentType(loadedAssignment.assignmentType ?? "");
+        setPriority(loadedAssignment.priority ?? "");
+        setStatus(loadedAssignment.status ?? "not_started");
+
+        setProblemCount(
+          loadedAssignment.problemCount === null ||
+            loadedAssignment.problemCount === undefined
+            ? ""
+            : String(loadedAssignment.problemCount)
+        );
+
+        setPageCount(
+          loadedAssignment.pageCount === null || loadedAssignment.pageCount === undefined
+            ? ""
+            : String(loadedAssignment.pageCount)
+        );
+
+        setNotes("");
+
+        setSummary(normalizeSummary(loadedAssignment.summary ?? ""));
+        setChecklistOverview(loadedAssignment.checklistOverview ?? "");
+        setChecklistItems(parseChecklistItems(loadedAssignment.checklistItems));
+
+        setLoadError("");
+        hasLoadedRef.current = true;
       } catch (e) {
         const message = e instanceof Error ? e.message : "Failed to load assignment";
         setLoadError(message);
@@ -180,46 +445,75 @@ export default function InputAssignmentSuccessPage() {
   }, [id, userId]);
 
   useEffect(() => {
-    async function summarize() {
+    async function runSummary() {
       if (!description.trim()) return;
 
       setSummaryLoading(true);
+
       try {
         const res = await fetch("/api/summarize-assignment", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title,
-            description,
-          }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ title, description }),
         });
 
-        const data = await res.json().catch(() => ({}));
+        const data = (await res.json().catch(() => ({}))) as SummarizeResponse;
 
         if (!res.ok) {
-          throw new Error(
-            (data as { message?: string })?.message || "Failed to summarize"
-          );
+          throw new Error((data as { error?: string })?.error || "Failed to summarize");
         }
 
-        setSummary(
-          typeof (data as { summary?: string })?.summary === "string"
-            ? (data as { summary: string }).summary
-            : ""
-        );
+        const nextSummary = normalizeSummary(data.summary);
+        setSummary(nextSummary);
+
+        if (!assignmentType && typeof data.assignmentType === "string" && data.assignmentType.trim()) {
+          setAssignmentType(data.assignmentType.trim().toLowerCase());
+        }
+
+        if (!priority && typeof data.priority === "string" && data.priority.trim()) {
+          setPriority(data.priority.trim().toLowerCase());
+        }
+
+        if (
+          (status === "not_started" || !status) &&
+          typeof data.status === "string" &&
+          data.status.trim()
+        ) {
+          setStatus(data.status.trim().toLowerCase());
+        }
+
+        if (
+          !problemCount &&
+          typeof data.problemCount === "number" &&
+          Number.isFinite(data.problemCount)
+        ) {
+          setProblemCount(String(data.problemCount));
+        }
+
+        if (
+          !pageCount &&
+          typeof data.pageCount === "number" &&
+          Number.isFinite(data.pageCount)
+        ) {
+          setPageCount(String(data.pageCount));
+        }
       } catch {
-        setSummary("");
+        setSummary(null);
       } finally {
         setSummaryLoading(false);
       }
     }
 
-    summarize();
+    if (!hasLoadedRef.current) return;
+    runSummary();
   }, [title, description]);
 
-  async function handleGenerateChecklist() {
+  async function generateChecklist() {
     if (!description.trim()) return;
 
+    isGeneratingChecklistRef.current = true;
     setChecklistLoading(true);
     setChecklistError("");
 
@@ -227,83 +521,82 @@ export default function InputAssignmentSuccessPage() {
       const res = await fetch("/api/generate-checklist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          description,
-        }),
+        body: JSON.stringify({ title, description, dueAt: dueAtLocal }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as ChecklistResponse;
 
       if (!res.ok) {
         throw new Error(
-          (data as { error?: string; message?: string })?.error ||
-            (data as { error?: string; message?: string })?.message ||
-            "Failed to generate checklist"
+          (data as { error?: string })?.error || "Failed to generate checklist"
         );
       }
 
-      const items: EditableChecklistItem[] = Array.isArray(
-        (data as { checklist?: ChecklistItem[] }).checklist
-      )
-        ? ((data as { checklist: ChecklistItem[] }).checklist || []).map((item) => ({
-            id: makeId(),
-            step: item.step,
-            minutes: item.minutes,
-            checked: false,
-          }))
-        : [];
+      const rawItems = Array.isArray(data.checklist) ? data.checklist : [];
+      const fallbackDates = generateFallbackDates(rawItems.length, dueAtLocal);
+
+      const mapped: EditableChecklistItem[] = rawItems.map((item, index) => ({
+        id: makeId(),
+        step: String(item?.step ?? ""),
+        minutes: Number(item?.minutes ?? 0),
+        dueDate:
+          typeof item?.dueDate === "string" && item.dueDate.trim()
+            ? item.dueDate
+            : fallbackDates[index] || "",
+        checked: false,
+      }));
 
       setChecklistOverview(
-        typeof (data as { overview?: string })?.overview === "string"
-          ? (data as { overview: string }).overview
-          : ""
+        typeof data.overview === "string" ? data.overview : ""
       );
-      setChecklistItems(items);
+      setChecklistItems(mapped);
     } catch (e) {
-      const message =
-        e instanceof Error ? e.message : "Failed to generate checklist";
-      setChecklistError(message);
+      setChecklistError(
+        e instanceof Error ? e.message : "Failed to generate checklist"
+      );
     } finally {
       setChecklistLoading(false);
+      isGeneratingChecklistRef.current = false;
     }
   }
 
   useEffect(() => {
-    handleGenerateChecklist();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description]);
+    if (!hasLoadedRef.current) return;
+    if (checklistItems.length > 0) return;
+    if (!description.trim()) return;
 
-  async function handleSaveChanges() {
-    if (!assignment || !userId) return;
+    generateChecklist();
+  }, [description, dueAtLocal]);
 
-    setSaving(true);
+  async function autoSave() {
+    if (!assignment || !userId || !hasLoadedRef.current) return;
+    if (isGeneratingChecklistRef.current) return;
+
+    setSaveState("saving");
     setSaveError("");
-    setSaveMessage("");
 
     try {
-      const body: {
-        title: string;
-        description: string;
-        courseId: number | null;
-        weight: number | null;
-        dueAt: string | null;
-      } = {
+      const summaryPayload = summary ? JSON.stringify(summary) : null;
+
+      const body = {
         title: title.trim(),
         description: description.trim(),
         courseId: selectedCourseId.trim() ? Number(selectedCourseId) : null,
         weight: weight.trim() ? Number(weight) : null,
         dueAt: dueAtLocal.trim() ? new Date(dueAtLocal).toISOString() : null,
-      };
 
-      if (!body.title) throw new Error("Title is required.");
-      if (!body.description) throw new Error("Description is required.");
-      if (weight.trim() && !Number.isFinite(body.weight)) {
-        throw new Error("Weight must be a valid number.");
-      }
-      if (dueAtLocal.trim() && Number.isNaN(new Date(dueAtLocal).getTime())) {
-        throw new Error("Due date is invalid.");
-      }
+        assignmentType: assignmentType.trim() || null,
+        priority: priority.trim() || null,
+        status: status.trim() || null,
+
+        problemCount: problemCount.trim() ? Number(problemCount) : null,
+        pageCount: pageCount.trim() ? Number(pageCount) : null,
+
+        notes: notes.trim() || null,
+        summary: summaryPayload,
+        checklistOverview: checklistOverview.trim() || null,
+        checklistItems,
+      };
 
       const res = await fetch(
         `http://localhost:4000/assignments/${assignment.id}?userId=${userId}`,
@@ -323,27 +616,37 @@ export default function InputAssignmentSuccessPage() {
       }
 
       setAssignment(data as Assignment);
-
-if (!data.courseId && courses.length > 0) {
-  const match = courses.find((c) =>
-    c.name.toLowerCase().includes((data.title || "").toLowerCase())
-  );
-
-  if (match) {
-    setAssignment({
-      ...data,
-      courseId: match.id,
-    } as Assignment);
-  }
-}
-      setSaveMessage("Changes saved.");
+      setSaveState("saved");
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Failed to save changes";
-      setSaveError(message);
-    } finally {
-      setSaving(false);
+      setSaveState("error");
+      setSaveError(e instanceof Error ? e.message : "Failed to save changes");
     }
   }
+
+  useEffect(() => {
+    if (!hasLoadedRef.current) return;
+
+    const timer = setTimeout(() => {
+      autoSave();
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [
+    title,
+    description,
+    weight,
+    dueAtLocal,
+    selectedCourseId,
+    assignmentType,
+    priority,
+    status,
+    problemCount,
+    pageCount,
+    notes,
+    summary,
+    checklistOverview,
+    checklistItems,
+  ]);
 
   async function handleCreateCourse() {
     if (!userId) return;
@@ -398,27 +701,12 @@ if (!data.courseId && courses.length > 0) {
     }
   }
 
-  function toggleStep(itemId: string) {
+  function updateChecklistItem(
+    itemId: string,
+    patch: Partial<EditableChecklistItem>
+  ) {
     setChecklistItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId ? { ...item, checked: !item.checked } : item
-      )
-    );
-  }
-
-  function updateStepText(itemId: string, value: string) {
-    setChecklistItems((prev) =>
-      prev.map((item) => (item.id === itemId ? { ...item, step: value } : item))
-    );
-  }
-
-  function updateStepMinutes(itemId: string, value: string) {
-    const num = value === "" ? 0 : Number(value);
-
-    setChecklistItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId ? { ...item, minutes: Number.isFinite(num) ? num : 0 } : item
-      )
+      prev.map((item) => (item.id === itemId ? { ...item, ...patch } : item))
     );
   }
 
@@ -429,6 +717,7 @@ if (!data.courseId && courses.length > 0) {
         id: makeId(),
         step: "",
         minutes: 15,
+        dueDate: "",
         checked: false,
       },
     ]);
@@ -439,20 +728,7 @@ if (!data.courseId && courses.length > 0) {
   }
 
   return (
-    <main
-      className="
-        mx-auto w-full max-w-[920px]
-        text-slate-900
-        [&_p]:m-0
-        [&_p]:text-slate-600
-        [&_p]:leading-6
-        [&_label]:m-0
-        [&_label]:text-slate-700
-        [&_input]:text-slate-900
-        [&_select]:text-slate-900
-        [&_textarea]:text-slate-900
-      "
-    >
+    <main className="mx-auto w-full max-w-[920px] text-slate-900">
       {loadError ? (
         <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {loadError}
@@ -465,61 +741,63 @@ if (!data.courseId && courses.length > 0) {
             <h1 className="text-[28px] font-semibold tracking-tight text-slate-900">
               Review assignment
             </h1>
-            <p className="mt-1 text-sm">
-              Check the detected details, fix anything that is wrong, and edit the checklist before you move on.
+            <p className="mt-1 text-sm text-slate-600">
+              Check the detected details and fix anything if needed.
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              Fields marked with a red asterisk still need to be filled in.
+              Fields marked with <span className="text-red-500">*</span> were not detected by AI.
+              You can still continue without filling them.
             </p>
 
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => router.push("/dashboard/input-assignments")}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
-                Add another
+                Add another assignment
               </button>
+
               <button
                 type="button"
-                onClick={handleSaveChanges}
-                disabled={saving}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                onClick={() => router.push("/dashboard")}
+                className="rounded-xl bg-slate-900 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800"
               >
-                {saving ? "Saving..." : "Save changes"}
+                Done
               </button>
+
+              <div className="ml-auto rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                {saveState === "saving" && "Saving..."}
+                {saveState === "saved" && "Saved"}
+                {saveState === "error" && "Save failed"}
+                {saveState === "idle" && "Ready"}
+              </div>
             </div>
           </div>
 
-          <div className="space-y-5 px-4 py-4">
-            {saveError ? (
+          <div className="space-y-6 px-4 py-4">
+            {saveState === "error" && saveError ? (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {saveError}
               </div>
             ) : null}
 
-            {saveMessage ? (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                {saveMessage}
-              </div>
-            ) : null}
-
-            <section className="space-y-3">
+            <section className="space-y-4">
               <div>
-                <label className="mb-1 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   <RequiredLabel label="Title" missing={missingTitle} />
                 </label>
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-0 md:grid-cols-1">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <div className="mb-1 flex items-center justify-between">
-                    <label className="text-sm font-medium">
+                    <label className="text-sm font-medium text-slate-700">
                       <RequiredLabel label="Class" missing={missingCourse} />
                     </label>
                     <button
@@ -535,43 +813,41 @@ if (!data.courseId && courses.length > 0) {
                   </div>
 
                   <select
-  value={assignment.courseId ?? ""}
-  onChange={(e) =>
-    setAssignment({
-      ...assignment,
-      courseId: Number(e.target.value),
-    })
-  }
->
-  <option value="">Select a class</option>
-  {courses.map((course) => (
-    <option key={course.id} value={course.id}>
-      {course.name}
-    </option>
-  ))}
-</select>
+                    value={selectedCourseId}
+                    onChange={(e) => setSelectedCourseId(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                  >
+                    <option value="">Select class</option>
+                    {courses.map((course) => (
+                      <option key={course.id} value={String(course.id)}>
+                        {course.name}
+                      </option>
+                    ))}
+                  </select>
 
                   {showCreateCourse ? (
-                    <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
                       <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
                         New class name
                       </label>
+
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <input
                           value={newCourseName}
                           onChange={(e) => setNewCourseName(e.target.value)}
                           placeholder="Ex: COMP 315"
-                          className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                          className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
                         />
                         <button
                           type="button"
                           onClick={handleCreateCourse}
                           disabled={creatingCourse}
-                          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                          className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                         >
                           {creatingCourse ? "Creating..." : "Create"}
                         </button>
                       </div>
+
                       {courseError ? (
                         <div className="mt-2 text-sm text-red-600">{courseError}</div>
                       ) : null}
@@ -580,192 +856,350 @@ if (!data.courseId && courses.length > 0) {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-sm font-medium">
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
                     <RequiredLabel label="Due date" missing={missingDueAt} />
                   </label>
                   <input
                     type="datetime-local"
                     value={dueAtLocal}
                     onChange={(e) => setDueAtLocal(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    <RequiredLabel label="Weight (%)" missing={missingWeight} />
+                  </label>
+                  <input
+                    type="number"
+                    value={weight}
+                    onChange={(e) => setWeight(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    <RequiredLabel label="Type" missing={missingType} />
+                  </label>
+                  <select
+                    value={assignmentType}
+                    onChange={(e) => setAssignmentType(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                  >
+                    <option value="">Select type</option>
+                    {ASSIGNMENT_TYPE_OPTIONS.map((type) => (
+                      <option key={type} value={type}>
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    <RequiredLabel label="Priority" missing={missingPriority} />
+                  </label>
+                  <select
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                  >
+                    <option value="">Select</option>
+                    {PRIORITY_OPTIONS.map((value) => (
+                      <option key={value} value={value}>
+                        {value.charAt(0).toUpperCase() + value.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    <RequiredLabel label="Status" missing={missingStatus} />
+                  </label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                  >
+                    {STATUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    <RequiredLabel label="Page count" missing={missingPageCount} />
+                  </label>
+                  <input
+                    type="number"
+                    value={pageCount}
+                    onChange={(e) => setPageCount(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    <RequiredLabel label="Problem count" missing={missingProblemCount} />
+                  </label>
+                  <input
+                    type="number"
+                    value={problemCount}
+                    onChange={(e) => setProblemCount(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
                   />
                 </div>
               </div>
 
-              <div className="max-w-[220px]">
-                <label className="mb-1 block text-sm font-medium">
-                  <RequiredLabel label="Weight (%)" missing={missingWeight} />
-                </label>
-                <input
-                  type="number"
-                  value={weight}
-                  onChange={(e) => setWeight(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                />
-              </div>
-
               <div>
-                <label className="mb-1 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Assignment description
                 </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={8}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-3 text-sm leading-6 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                  className="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm leading-6 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Notes
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Optional notes..."
+                  className="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm leading-6 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
                 />
               </div>
             </section>
 
-            <section className="space-y-2 border-t border-slate-100 pt-4">
+            <section className="space-y-3 border-t border-slate-100 pt-4">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">AI summary</h2>
-                <p className="mt-1 text-sm">Short version of the assignment.</p>
+                <h2 className="text-lg font-semibold text-slate-900">AI Summary</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Short version of the assignment.
+                </p>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800 whitespace-pre-wrap">
-                {summaryLoading ? "Summarizing..." : summary || "No summary"}
-              </div>
+              {!summaryLoading && !summary ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                  No summary
+                </div>
+              ) : (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-800">
+                  {summaryLoading ? (
+                    "Summarizing..."
+                  ) : (
+                    <div className="space-y-3">
+                      {summary?.focus ? (
+                        <p>
+                          <span className="font-semibold">Focus:</span> {summary.focus}
+                        </p>
+                      ) : null}
+
+                      {summary?.content ? (
+                        <p>
+                          <span className="font-semibold">Content Requirements:</span>{" "}
+                          {summary.content}
+                        </p>
+                      ) : null}
+
+                      {summary?.sources ? (
+                        <p>
+                          <span className="font-semibold">Research Sources:</span>{" "}
+                          {summary.sources}
+                        </p>
+                      ) : null}
+
+                      {summary?.structure ? (
+                        <p>
+                          <span className="font-semibold">Structure:</span>{" "}
+                          {summary.structure}
+                        </p>
+                      ) : null}
+
+                      {summary?.formatting ? (
+                        <p>
+                          <span className="font-semibold">Formatting & Submission:</span>{" "}
+                          {summary.formatting}
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
 
             <section className="space-y-3 border-t border-slate-100 pt-4">
-  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-      <h2 className="text-lg font-semibold text-slate-900">Checklist</h2>
-      <p className="mt-1 text-sm">Edit tasks and time estimates.</p>
-    </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Checklist</h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Edit tasks, dates, and time estimates.
+                  </p>
+                </div>
 
-    <div className="flex flex-wrap gap-2">
-      <button
-        type="button"
-        onClick={addChecklistItem}
-        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-      >
-        Add item
-      </button>
-      <button
-        type="button"
-        onClick={handleGenerateChecklist}
-        disabled={checklistLoading}
-        className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-      >
-        {checklistLoading ? "Generating..." : "Regenerate"}
-      </button>
-    </div>
-  </div>
+                <button
+                  type="button"
+                  onClick={addChecklistItem}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Add item
+                </button>
+              </div>
 
-  {checklistError ? (
-    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-      {checklistError}
-    </div>
-  ) : null}
+              {checklistError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {checklistError}
+                </div>
+              ) : null}
 
-  <div className="flex flex-wrap gap-2">
-    <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
-      Total time: {totalMinutes} min
-    </div>
-    <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
-      {completedCount}/{checklistItems.length} completed
-    </div>
-  </div>
+              <div className="flex flex-wrap gap-2">
+                <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                  {completedCount}/{checklistItems.length} completed
+                </div>
+                <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                  Total: {totalMinutes} min
+                </div>
+                <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                  Remaining: {remainingMinutes} min
+                </div>
+              </div>
 
-  <textarea
-    value={checklistOverview}
-    onChange={(e) => setChecklistOverview(e.target.value)}
-    placeholder="Checklist overview..."
-    rows={2}
-    className="w-full rounded-lg border border-slate-300 px-3 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-  />
+              <textarea
+                value={checklistOverview}
+                onChange={(e) => setChecklistOverview(e.target.value)}
+                placeholder="Checklist overview..."
+                rows={2}
+                className="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+              />
 
-  {!checklistItems.length && !checklistLoading ? (
-    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-      No checklist yet.
-    </div>
-  ) : null}
+              {!checklistItems.length && !checklistLoading ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                  No checklist yet.
+                </div>
+              ) : null}
 
-<p className="mt-1 text-sm text-slate-600">
-  Check off completed steps, edit task names, change minutes, or remove items.
-</p>
+              {checklistItems.length ? (
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full border-collapse text-sm text-slate-900">
+                    <thead className="bg-slate-50 text-slate-600">
+                      <tr>
+                        <th className="w-16 border-b border-slate-200 px-3 py-2 text-left font-semibold">
+                          ✓
+                        </th>
+                        <th className="w-16 border-b border-slate-200 px-3 py-2 text-left font-semibold">
+                          #
+                        </th>
+                        <th className="border-b border-slate-200 px-3 py-2 text-left font-semibold">
+                          Task
+                        </th>
+                        <th className="w-28 border-b border-slate-200 px-3 py-2 text-left font-semibold">
+                          Min
+                        </th>
+                        <th className="w-40 border-b border-slate-200 px-3 py-2 text-left font-semibold">
+                          Date
+                        </th>
+                        <th className="w-24 border-b border-slate-200 px-3 py-2 text-left font-semibold">
+                          Action
+                        </th>
+                      </tr>
+                    </thead>
 
- {checklistItems.length ? (
-  <div className="overflow-x-auto rounded-lg border border-slate-200">
-    <table className="w-full border-collapse text-sm text-slate-900">
-      <thead className="bg-slate-50 text-slate-600">
-        <tr>
-          <th className="w-16 border-b border-slate-200 px-3 py-2 text-left font-semibold">
-            Done
-          </th>
-          <th className="w-16 border-b border-slate-200 px-3 py-2 text-left font-semibold">
-            Step
-          </th>
-          <th className="border-b border-slate-200 px-3 py-2 text-left font-semibold">
-            Task
-          </th>
-          <th className="w-28 border-b border-slate-200 px-3 py-2 text-left font-semibold">
-            Minutes
-          </th>
-          <th className="w-28 border-b border-slate-200 px-3 py-2 text-left font-semibold">
-            Action
-          </th>
-        </tr>
-      </thead>
+                    <tbody>
+                      {checklistItems.map((item, index) => (
+                        <tr
+                          key={item.id}
+                          className="border-b border-slate-200 last:border-b-0"
+                        >
+                          <td className="px-3 py-2 align-middle">
+                            <input
+                              type="checkbox"
+                              checked={item.checked}
+                              onChange={() =>
+                                updateChecklistItem(item.id, {
+                                  checked: !item.checked,
+                                })
+                              }
+                              className="h-4 w-4"
+                              aria-label={`Mark step ${index + 1} complete`}
+                            />
+                          </td>
 
-      <tbody>
-        {checklistItems.map((item, index) => (
-          <tr key={item.id} className="border-b border-slate-200 last:border-b-0">
-  <td className="px-3 py-2 align-middle">
-    <input
-      type="checkbox"
-      checked={item.checked}
-      onChange={() => toggleStep(item.id)}
-      className="h-4 w-4"
-      aria-label={`Mark step ${index + 1} complete`}
-    />
-  </td>
+                          <td className="px-3 py-2 align-middle text-slate-600">
+                            {index + 1}
+                          </td>
 
-  <td className="px-3 py-2 align-middle text-slate-600">
-    {index + 1}
-  </td>
+                          <td className="px-3 py-2 align-middle">
+                            <input
+                              value={item.step}
+                              onChange={(e) =>
+                                updateChecklistItem(item.id, {
+                                  step: e.target.value,
+                                })
+                              }
+                              className={`w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100 ${
+                                item.checked ? "text-slate-400 line-through" : "text-slate-900"
+                              }`}
+                              placeholder={`Step ${index + 1} task`}
+                            />
+                          </td>
 
-  <td className="px-3 py-2 align-middle">
-    <input
-  value={item.step}
-  onChange={(e) => updateStepText(item.id, e.target.value)}
-  placeholder={`Step ${index + 1} task`}
-  style={{ width: "100%" }}   // ← THIS is the key
-  className={`rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100 ${
-    item.checked ? "text-slate-400 line-through" : "text-slate-900"
-  }`}
-/>
-  </td>
+                          <td className="px-3 py-2 align-middle">
+                            <input
+                              type="number"
+                              min={0}
+                              value={item.minutes}
+                              onChange={(e) =>
+                                updateChecklistItem(item.id, {
+                                  minutes: Number.isFinite(Number(e.target.value))
+                                    ? Number(e.target.value)
+                                    : 0,
+                                })
+                              }
+                              className="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                            />
+                          </td>
 
-  <td className="px-3 py-2 align-middle">
-    <input
-      type="number"
-      min={0}
-      value={item.minutes}
-      onChange={(e) => updateStepMinutes(item.id, e.target.value)}
-      className="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-      aria-label={`Minutes for step ${index + 1}`}
-    />
-  </td>
+                          <td className="px-3 py-2 align-middle">
+                            <input
+                              type="date"
+                              value={item.dueDate}
+                              onChange={(e) =>
+                                updateChecklistItem(item.id, {
+                                  dueDate: e.target.value,
+                                })
+                              }
+                              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                            />
+                          </td>
 
-  <td className="px-3 py-2 align-middle">
-    <button
-      type="button"
-      onClick={() => removeChecklistItem(item.id)}
-      className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-slate-50"
-    >
-      Remove
-    </button>
-  </td>
-</tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-) : null}
-</section>
+                          <td className="px-3 py-2 align-middle">
+                            <button
+                              type="button"
+                              onClick={() => removeChecklistItem(item.id)}
+                              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-slate-50"
+                            >
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </section>
           </div>
         </div>
       ) : null}
