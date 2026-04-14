@@ -2,6 +2,7 @@ export type ChecklistItemDto = {
   id: string;
   step: string;
   minutes: number;
+  dueDate: string;
   checked: boolean;
 };
 
