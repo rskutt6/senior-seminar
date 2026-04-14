@@ -39,8 +39,8 @@ export async function POST(req: Request) {
     }
 
     const response = await openai.responses.create({
-      model: "gpt-4o-mini",
-      input: `Extract assignment details.
+  model: "gpt-4o-mini",
+  input: `Extract assignment details.
 
 Return ONLY valid JSON:
 {
@@ -48,48 +48,41 @@ Return ONLY valid JSON:
   "courseName": "string | null",
   "dueAt": "string | null",
   "weight": number | null,
-  "assignmentType": "string | null",
-  "problemCount": number | null",
+  "assignmentType": "string",
+  "problemCount": number | null,
   "pageCount": number | null,
-  "priority": "string | null",
-  "status": "string | null",
+  "priority": "string",
+  "status": "string",
   "notes": "string | null",
-  "summary": "string | null"
+  "summary": {
+    "focus": "Main goal of the assignment",
+    "content": "What you need to do",
+    "sources": "Any research or sources needed",
+    "structure": "How it should be organized",
+    "formatting": "Formatting or submission requirements"
+  }
 }
 
 Rules:
-- courseName MUST match the closest existing class from this list when possible:
-${classes.length ? classes.join(", ") : "none"}
-
 - assignmentType MUST be one of:
 homework, essay, reading, project, discussion, exam, quiz, lab, presentation, other
 
-Rules:
-- Choose the BEST match based on description
 - If unsure → default to "homework"
-- NEVER return null
-
-- dueAt:
-  - return ISO datetime if found
-  - understand dates like April 1, Apr 1, 4/1, 4/1/26
-  - if no time, use 23:59:00
 
 - priority:
-  - high if urgent, heavy, or important
-  - medium for normal assignments
-  - low for smaller/lighter work
+  high = urgent/heavy
+  medium = normal
+  low = small
 
-- status:
-  - default to "not_started"
+- status ALWAYS = "not_started"
 
-- problemCount if clearly stated
-- pageCount if clearly stated
-- notes should be short extra details if useful, otherwise null
-- summary should be one short sentence
+- summary fields: 1–2 SHORT sentences each
+
+- detect pageCount and problemCount if present
 
 Text:
-${description}`,
-    });
+${description}`
+});
 
     const raw = response.output_text?.trim() || "";
     const parsed = JSON.parse(extractJsonObject(raw));
@@ -136,8 +129,8 @@ ${description}`,
           ? parsed.notes.trim()
           : null,
       summary:
-        typeof parsed.summary === "string" && parsed.summary.trim()
-          ? parsed.summary.trim()
+        typeof parsed.summary === "object" && parsed.summary !== null
+          ? parsed.summary
           : null,
     });
   } catch (e) {
