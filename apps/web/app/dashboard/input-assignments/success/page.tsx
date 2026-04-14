@@ -727,482 +727,464 @@ export default function InputAssignmentSuccessPage() {
     setChecklistItems((prev) => prev.filter((item) => item.id !== itemId));
   }
 
-  return (
-    <main className="mx-auto w-full max-w-[920px] text-slate-900">
-      {loadError ? (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {loadError}
-        </div>
-      ) : null}
-
-      {assignment ? (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 px-4 py-4">
-            <h1 className="text-[28px] font-semibold tracking-tight text-slate-900">
-              Review assignment
-            </h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Check the detected details and fix anything if needed.
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Fields marked with <span className="text-red-500">*</span> were not detected by AI.
-              You can still continue without filling them.
-            </p>
-
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => router.push("/dashboard/input-assignments")}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Add another assignment
-              </button>
-
-              <button
-                type="button"
-                onClick={() => router.push("/dashboard")}
-                className="rounded-xl bg-slate-900 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800"
-              >
-                Done
-              </button>
-
-              <div className="ml-auto rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
-                {saveState === "saving" && "Saving..."}
-                {saveState === "saved" && "Saved"}
-                {saveState === "error" && "Save failed"}
-                {saveState === "idle" && "Ready"}
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-6 px-4 py-4">
-            {saveState === "error" && saveError ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {saveError}
-              </div>
-            ) : null}
-
-            <section className="space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  <RequiredLabel label="Title" missing={missingTitle} />
-                </label>
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <div className="mb-1 flex items-center justify-between">
-                    <label className="text-sm font-medium text-slate-700">
-                      <RequiredLabel label="Class" missing={missingCourse} />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCreateCourse((prev) => !prev);
-                        setCourseError("");
-                      }}
-                      className="text-xs font-medium text-slate-600 hover:text-slate-900"
-                    >
-                      {showCreateCourse ? "Cancel" : "+ New class"}
-                    </button>
-                  </div>
-
-                  <select
-                    value={selectedCourseId}
-                    onChange={(e) => setSelectedCourseId(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                  >
-                    <option value="">Select class</option>
-                    {courses.map((course) => (
-                      <option key={course.id} value={String(course.id)}>
-                        {course.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  {showCreateCourse ? (
-                    <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                      <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
-                        New class name
-                      </label>
-
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <input
-                          value={newCourseName}
-                          onChange={(e) => setNewCourseName(e.target.value)}
-                          placeholder="Ex: COMP 315"
-                          className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleCreateCourse}
-                          disabled={creatingCourse}
-                          className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                        >
-                          {creatingCourse ? "Creating..." : "Create"}
-                        </button>
-                      </div>
-
-                      {courseError ? (
-                        <div className="mt-2 text-sm text-red-600">{courseError}</div>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    <RequiredLabel label="Due date" missing={missingDueAt} />
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={dueAtLocal}
-                    onChange={(e) => setDueAtLocal(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    <RequiredLabel label="Weight (%)" missing={missingWeight} />
-                  </label>
-                  <input
-                    type="number"
-                    value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    <RequiredLabel label="Type" missing={missingType} />
-                  </label>
-                  <select
-                    value={assignmentType}
-                    onChange={(e) => setAssignmentType(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                  >
-                    <option value="">Select type</option>
-                    {ASSIGNMENT_TYPE_OPTIONS.map((type) => (
-                      <option key={type} value={type}>
-                        {type.charAt(0).toUpperCase() + type.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    <RequiredLabel label="Priority" missing={missingPriority} />
-                  </label>
-                  <select
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                  >
-                    <option value="">Select</option>
-                    {PRIORITY_OPTIONS.map((value) => (
-                      <option key={value} value={value}>
-                        {value.charAt(0).toUpperCase() + value.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    <RequiredLabel label="Status" missing={missingStatus} />
-                  </label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                  >
-                    {STATUS_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    <RequiredLabel label="Page count" missing={missingPageCount} />
-                  </label>
-                  <input
-                    type="number"
-                    value={pageCount}
-                    onChange={(e) => setPageCount(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    <RequiredLabel label="Problem count" missing={missingProblemCount} />
-                  </label>
-                  <input
-                    type="number"
-                    value={problemCount}
-                    onChange={(e) => setProblemCount(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Assignment description
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={8}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm leading-6 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Notes
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  placeholder="Optional notes..."
-                  className="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm leading-6 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                />
-              </div>
-            </section>
-
-            <section className="space-y-3 border-t border-slate-100 pt-4">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">AI Summary</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Short version of the assignment.
-                </p>
-              </div>
-
-              {!summaryLoading && !summary ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                  No summary
-                </div>
-              ) : (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-800">
-                  {summaryLoading ? (
-                    "Summarizing..."
-                  ) : (
-                    <div className="space-y-3">
-                      {summary?.focus ? (
-                        <p>
-                          <span className="font-semibold">Focus:</span> {summary.focus}
-                        </p>
-                      ) : null}
-
-                      {summary?.content ? (
-                        <p>
-                          <span className="font-semibold">Content Requirements:</span>{" "}
-                          {summary.content}
-                        </p>
-                      ) : null}
-
-                      {summary?.sources ? (
-                        <p>
-                          <span className="font-semibold">Research Sources:</span>{" "}
-                          {summary.sources}
-                        </p>
-                      ) : null}
-
-                      {summary?.structure ? (
-                        <p>
-                          <span className="font-semibold">Structure:</span>{" "}
-                          {summary.structure}
-                        </p>
-                      ) : null}
-
-                      {summary?.formatting ? (
-                        <p>
-                          <span className="font-semibold">Formatting & Submission:</span>{" "}
-                          {summary.formatting}
-                        </p>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
-
-            <section className="space-y-3 border-t border-slate-100 pt-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Checklist</h2>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Edit tasks, dates, and time estimates.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={addChecklistItem}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Add item
-                </button>
-              </div>
-
-              {checklistError ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {checklistError}
-                </div>
-              ) : null}
-
-              <div className="flex flex-wrap gap-2">
-                <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
-                  {completedCount}/{checklistItems.length} completed
-                </div>
-                <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
-                  Total: {totalMinutes} min
-                </div>
-                <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
-                  Remaining: {remainingMinutes} min
-                </div>
-              </div>
-
-              <textarea
-                value={checklistOverview}
-                onChange={(e) => setChecklistOverview(e.target.value)}
-                placeholder="Checklist overview..."
-                rows={2}
-                className="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-              />
-
-              {!checklistItems.length && !checklistLoading ? (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-                  No checklist yet.
-                </div>
-              ) : null}
-
-              {checklistItems.length ? (
-                <div className="overflow-x-auto rounded-xl border border-slate-200">
-                  <table className="w-full border-collapse text-sm text-slate-900">
-                    <thead className="bg-slate-50 text-slate-600">
-                      <tr>
-                        <th className="w-16 border-b border-slate-200 px-3 py-2 text-left font-semibold">
-                          ✓
-                        </th>
-                        <th className="w-16 border-b border-slate-200 px-3 py-2 text-left font-semibold">
-                          #
-                        </th>
-                        <th className="border-b border-slate-200 px-3 py-2 text-left font-semibold">
-                          Task
-                        </th>
-                        <th className="w-28 border-b border-slate-200 px-3 py-2 text-left font-semibold">
-                          Min
-                        </th>
-                        <th className="w-40 border-b border-slate-200 px-3 py-2 text-left font-semibold">
-                          Date
-                        </th>
-                        <th className="w-24 border-b border-slate-200 px-3 py-2 text-left font-semibold">
-                          Action
-                        </th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {checklistItems.map((item, index) => (
-                        <tr
-                          key={item.id}
-                          className="border-b border-slate-200 last:border-b-0"
-                        >
-                          <td className="px-3 py-2 align-middle">
-                            <input
-                              type="checkbox"
-                              checked={item.checked}
-                              onChange={() =>
-                                updateChecklistItem(item.id, {
-                                  checked: !item.checked,
-                                })
-                              }
-                              className="h-4 w-4"
-                              aria-label={`Mark step ${index + 1} complete`}
-                            />
-                          </td>
-
-                          <td className="px-3 py-2 align-middle text-slate-600">
-                            {index + 1}
-                          </td>
-
-                          <td className="px-3 py-2 align-middle">
-                            <input
-                              value={item.step}
-                              onChange={(e) =>
-                                updateChecklistItem(item.id, {
-                                  step: e.target.value,
-                                })
-                              }
-                              className={`w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100 ${
-                                item.checked ? "text-slate-400 line-through" : "text-slate-900"
-                              }`}
-                              placeholder={`Step ${index + 1} task`}
-                            />
-                          </td>
-
-                          <td className="px-3 py-2 align-middle">
-                            <input
-                              type="number"
-                              min={0}
-                              value={item.minutes}
-                              onChange={(e) =>
-                                updateChecklistItem(item.id, {
-                                  minutes: Number.isFinite(Number(e.target.value))
-                                    ? Number(e.target.value)
-                                    : 0,
-                                })
-                              }
-                              className="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                            />
-                          </td>
-
-                          <td className="px-3 py-2 align-middle">
-                            <input
-                              type="date"
-                              value={item.dueDate}
-                              onChange={(e) =>
-                                updateChecklistItem(item.id, {
-                                  dueDate: e.target.value,
-                                })
-                              }
-                              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-                            />
-                          </td>
-
-                          <td className="px-3 py-2 align-middle">
-                            <button
-                              type="button"
-                              onClick={() => removeChecklistItem(item.id)}
-                              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-slate-50"
-                            >
-                              Remove
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : null}
-            </section>
-          </div>
-        </div>
-      ) : null}
-    </main>
-  );
+  function SummaryItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-slate-800">{value}</p>
+    </div>
+  );
 }
+
+function StatPill({ label }: { label: string }) {
+  return (
+    <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700">
+      {label}
+    </div>
+  );
+}
+
+  return (
+  <main className="mx-auto w-full max-w-6xl px-4 py-6 text-slate-900 md:px-6 lg:px-8">
+    {loadError ? (
+      <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {loadError}
+      </div>
+    ) : null}
+
+    {assignment ? (
+      <div className="space-y-6">
+        {/* Sticky top bar */}
+        <section className="sticky top-4 z-20 rounded-2xl border border-slate-200 bg-white/90 backdrop-blur shadow-sm">
+          <div className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                Review assignment
+              </h1>
+              <p className="mt-1 text-sm text-slate-600">
+                Check the detected details and fix anything if needed.
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Fields marked with <span className="text-red-500">*</span> were not detected by AI.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                {saveState === "saving" && "Saving..."}
+                {saveState === "saved" && "Saved"}
+                {saveState === "error" && "Save failed"}
+                {saveState === "idle" && "Ready"}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard/input-assignments")}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Add another
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard")}
+                className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {saveState === "error" && saveError ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {saveError}
+          </div>
+        ) : null}
+
+        {/* Basics */}
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-5 py-4">
+            <h2 className="text-base font-semibold text-slate-900">Basics</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Core assignment information.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 px-5 py-5 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                <RequiredLabel label="Title" missing={missingTitle} />
+              </label>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Assignment title"
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm outline-none transition focus:border-slate-500 focus:ring-4 focus:ring-slate-100"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="block text-sm font-medium text-slate-700">
+                  <RequiredLabel label="Class" missing={missingCourse} />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateCourse((prev) => !prev);
+                    setCourseError("");
+                  }}
+                  className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                >
+                  {showCreateCourse ? "Cancel" : "+ New class"}
+                </button>
+              </div>
+
+              <select
+                value={selectedCourseId}
+                onChange={(e) => setSelectedCourseId(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm outline-none transition focus:border-slate-500 focus:ring-4 focus:ring-slate-100"
+              >
+                <option value="">Select class</option>
+                {courses.map((course) => (
+                  <option key={course.id} value={String(course.id)}>
+                    {course.name}
+                  </option>
+                ))}
+              </select>
+
+              {showCreateCourse ? (
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    New class name
+                  </label>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      value={newCourseName}
+                      onChange={(e) => setNewCourseName(e.target.value)}
+                      placeholder="Ex: COMP 315"
+                      className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCreateCourse}
+                      disabled={creatingCourse}
+                      className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                      {creatingCourse ? "Creating..." : "Create"}
+                    </button>
+                  </div>
+
+                  {courseError ? (
+                    <p className="mt-2 text-sm text-red-600">{courseError}</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                <RequiredLabel label="Due date" missing={missingDueAt} />
+              </label>
+              <input
+                type="datetime-local"
+                value={dueAtLocal}
+                onChange={(e) => setDueAtLocal(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm outline-none transition focus:border-slate-500 focus:ring-4 focus:ring-slate-100"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Details */}
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-5 py-4">
+            <h2 className="text-base font-semibold text-slate-900">Details</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Smaller metadata that helps organize the assignment.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 px-5 py-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                <RequiredLabel label="Weight (%)" missing={missingWeight} />
+              </label>
+              <input
+                type="number"
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-100"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                <RequiredLabel label="Type" missing={missingType} />
+              </label>
+              <select
+                value={assignmentType}
+                onChange={(e) => setAssignmentType(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-100"
+              >
+                <option value="">Select type</option>
+                {ASSIGNMENT_TYPE_OPTIONS.map((type) => (
+                  <option key={type} value={type}>
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                <RequiredLabel label="Priority" missing={missingPriority} />
+              </label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-100"
+              >
+                <option value="">Select</option>
+                {PRIORITY_OPTIONS.map((value) => (
+                  <option key={value} value={value}>
+                    {value.charAt(0).toUpperCase() + value.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                <RequiredLabel label="Status" missing={missingStatus} />
+              </label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-100"
+              >
+                {STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                <RequiredLabel label="Page count" missing={missingPageCount} />
+              </label>
+              <input
+                type="number"
+                value={pageCount}
+                onChange={(e) => setPageCount(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-100"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                <RequiredLabel label="Problem count" missing={missingProblemCount} />
+              </label>
+              <input
+                type="number"
+                value={problemCount}
+                onChange={(e) => setProblemCount(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-100"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Description + notes */}
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h2 className="text-base font-semibold text-slate-900">Assignment description</h2>
+            </div>
+            <div className="px-5 py-5">
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={14}
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm leading-6 outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-100"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h2 className="text-base font-semibold text-slate-900">Notes</h2>
+              <p className="mt-1 text-sm text-slate-500">Optional reminders or personal context.</p>
+            </div>
+            <div className="px-5 py-5">
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={14}
+                placeholder="Optional notes..."
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm leading-6 outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-100"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* AI Summary */}
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-5 py-4">
+            <h2 className="text-base font-semibold text-slate-900">AI Summary</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              A quick breakdown of the important parts of the assignment.
+            </p>
+          </div>
+
+          <div className="px-5 py-5">
+            {!summaryLoading && !summary ? (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                No summary yet.
+              </div>
+            ) : summaryLoading ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-600">
+                Summarizing...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {summary?.focus ? <SummaryItem label="Focus" value={summary.focus} /> : null}
+                {summary?.content ? <SummaryItem label="Content" value={summary.content} /> : null}
+                {summary?.sources ? <SummaryItem label="Sources" value={summary.sources} /> : null}
+                {summary?.structure ? <SummaryItem label="Structure" value={summary.structure} /> : null}
+                {summary?.formatting ? (
+                  <div className="md:col-span-2">
+                    <SummaryItem label="Formatting & Submission" value={summary.formatting} />
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Checklist */}
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-5 py-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">Checklist</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Edit tasks, dates, and time estimates.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={addChecklistItem}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Add item
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-4 px-5 py-5">
+            {checklistError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {checklistError}
+              </div>
+            ) : null}
+
+            <div className="flex flex-wrap gap-2">
+              <StatPill label={`${completedCount}/${checklistItems.length} completed`} />
+              <StatPill label={`Total: ${totalMinutes} min`} />
+              <StatPill label={`Remaining: ${remainingMinutes} min`} />
+            </div>
+
+            <textarea
+              value={checklistOverview}
+              onChange={(e) => setChecklistOverview(e.target.value)}
+              placeholder="Checklist overview..."
+              rows={3}
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm leading-6 outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-100"
+            />
+
+            {!checklistItems.length && !checklistLoading ? (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                No checklist yet.
+              </div>
+            ) : null}
+
+            <div className="space-y-3">
+              {checklistItems.map((item, index) => (
+                <div
+                  key={item.id}
+                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-4"
+                >
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-[auto_1fr_120px_170px_auto] lg:items-center">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        onChange={() =>
+                          updateChecklistItem(item.id, { checked: !item.checked })
+                        }
+                        className="h-4 w-4"
+                        aria-label={`Mark step ${index + 1} complete`}
+                      />
+                      <span className="text-sm font-medium text-slate-500">
+                        #{index + 1}
+                      </span>
+                    </div>
+
+                    <input
+                      value={item.step}
+                      onChange={(e) =>
+                        updateChecklistItem(item.id, { step: e.target.value })
+                      }
+                      placeholder={`Step ${index + 1} task`}
+                      className={`w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-100 ${
+                        item.checked ? "text-slate-400 line-through" : "text-slate-900"
+                      }`}
+                    />
+
+                    <input
+                      type="number"
+                      min={0}
+                      value={item.minutes}
+                      onChange={(e) =>
+                        updateChecklistItem(item.id, {
+                          minutes: Number.isFinite(Number(e.target.value))
+                            ? Number(e.target.value)
+                            : 0,
+                        })
+                      }
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-100"
+                    />
+
+                    <input
+                      type="date"
+                      value={item.dueDate}
+                      onChange={(e) =>
+                        updateChecklistItem(item.id, { dueDate: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-4 focus:ring-slate-100"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => removeChecklistItem(item.id)}
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </div>
+    ) : null}
+  </main>
+);}
