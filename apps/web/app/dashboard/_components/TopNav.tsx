@@ -19,6 +19,14 @@ export default function TopNav() {
   useEffect(() => {
     const stored = localStorage.getItem('name');
     if (stored) setName(stored);
+
+    const handleStorage = () => {
+      const updated = localStorage.getItem('name');
+      setName(updated || '');
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   const handleLogout = () => {
