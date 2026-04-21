@@ -4,9 +4,20 @@ import { useState } from 'react';
 export default function SettingsPage() {
   const [profile, setProfile] = useState({ name: '', email: '' });
   const [passwords, setPasswords] = useState({ new: '', confirm: '' });
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [passwordSaved, setPasswordSaved] = useState(false);
 
   const handleSaveProfile = () => {
     localStorage.setItem('name', profile.name);
+    window.dispatchEvent(new Event('storage'));
+    setProfileSaved(true);
+    setTimeout(() => setProfileSaved(false), 2500);
+  };
+
+  const handleSavePassword = () => {
+    if (!passwords.new || passwords.new !== passwords.confirm) return;
+    setPasswordSaved(true);
+    setTimeout(() => setPasswordSaved(false), 2500);
   };
 
   return (
@@ -36,7 +47,10 @@ export default function SettingsPage() {
               onChange={(e) => setProfile({ ...profile, email: e.target.value })}
             />
           </div>
-          <button style={saveBtn} onClick={handleSaveProfile}>Save profile</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button style={saveBtn} onClick={handleSaveProfile}>Save profile</button>
+            {profileSaved && <span style={savedMsg}>Saved!</span>}
+          </div>
         </section>
 
         <section style={section}>
@@ -61,7 +75,13 @@ export default function SettingsPage() {
               onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
             />
           </div>
-          <button style={saveBtn}>Update password</button>
+          {passwords.new && passwords.confirm && passwords.new !== passwords.confirm && (
+            <p style={errorMsg}>Passwords don't match</p>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button style={saveBtn} onClick={handleSavePassword}>Update password</button>
+            {passwordSaved && <span style={savedMsg}>Updated!</span>}
+          </div>
         </section>
       </div>
     </main>
@@ -76,4 +96,6 @@ const sectionTitle: React.CSSProperties = { fontSize: 15, fontWeight: 700, color
 const field: React.CSSProperties = { marginBottom: 14 };
 const label: React.CSSProperties = { fontSize: 13, color: '#8A7967', marginBottom: 6, display: 'block' };
 const input: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #9CAF88', background: '#F4F1EC', color: '#6E7F5B', fontSize: 14, fontFamily: 'inherit', outline: 'none' };
-const saveBtn: React.CSSProperties = { marginTop: 6, width: '100%', padding: 12, borderRadius: 12, border: 'none', background: '#6E7F5B', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' };
+const saveBtn: React.CSSProperties = { marginTop: 6, padding: '10px 24px', borderRadius: 12, border: 'none', background: '#6E7F5B', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' };
+const savedMsg: React.CSSProperties = { fontSize: 13, color: '#9CAF88', fontWeight: 700, marginTop: 6 };
+const errorMsg: React.CSSProperties = { fontSize: 13, color: '#c9837a', marginBottom: 10 };
