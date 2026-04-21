@@ -1,5 +1,4 @@
 "use client";
-
 import { useRef, useState } from "react";
 
 type TTSState = "idle" | "loading" | "ready" | "generating" | "done";
@@ -14,49 +13,25 @@ export default function CreateAudioPage() {
   const [error, setError] = useState("");
   const [audioUrl, setAudioUrl] = useState("");
   const [loading, setLoading] = useState(false);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeText = mode === "pdf" ? extractedText : pastedText.trim();
-  const readyLabel =
-    mode === "pdf" ? fileName || "Uploaded PDF" : "Pasted text";
+  const readyLabel = mode === "pdf" ? fileName || "Uploaded PDF" : "Pasted text";
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setError("");
-    setAudioUrl("");
-    setLoading(false);
-    setTtsState("loading");
-    setFileName(file.name);
-    setExtractedText("");
-
+    setError(""); setAudioUrl(""); setLoading(false);
+    setTtsState("loading"); setFileName(file.name); setExtractedText("");
     const formData = new FormData();
     formData.append("file", file);
-
     try {
-      const res = await fetch("http://localhost:4000/pdf/extract-text", {
-        method: "POST",
-        body: formData,
-      });
-
+      const res = await fetch("http://localhost:4000/pdf/extract-text", { method: "POST", body: formData });
       let data: any = null;
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
-      }
-
-      if (!res.ok) {
-        throw new Error(data?.message || "Failed to extract text");
-      }
-
+      try { data = await res.json(); } catch { data = null; }
+      if (!res.ok) throw new Error(data?.message || "Failed to extract text");
       const text = data?.text?.trim?.() ?? "";
-      if (!text) {
-        throw new Error("No readable text found in this PDF");
-      }
-
+      if (!text) throw new Error("No readable text found in this PDF");
       setExtractedText(text);
       setTtsState("ready");
     } catch (err: any) {
@@ -66,67 +41,30 @@ export default function CreateAudioPage() {
   }
 
   function handleModeChange(nextMode: InputMode) {
-    setError("");
-    setAudioUrl("");
-    setLoading(false);
-    setMode(nextMode);
-
-    if (nextMode === "text") {
-      setTtsState(pastedText.trim() ? "ready" : "idle");
-    } else {
-      setTtsState(extractedText ? "ready" : "idle");
-    }
+    setError(""); setAudioUrl(""); setLoading(false); setMode(nextMode);
+    if (nextMode === "text") setTtsState(pastedText.trim() ? "ready" : "idle");
+    else setTtsState(extractedText ? "ready" : "idle");
   }
 
   function handleTextChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const value = e.target.value;
-    setPastedText(value);
-    setError("");
-    setAudioUrl("");
-
-    if (mode === "text") {
-      setTtsState(value.trim() ? "ready" : "idle");
-    }
+    setPastedText(value); setError(""); setAudioUrl("");
+    if (mode === "text") setTtsState(value.trim() ? "ready" : "idle");
   }
 
   async function generateAudio() {
     if (!activeText) return;
-
     try {
-      setError("");
-      setAudioUrl("");
-      setLoading(true);
-      setTtsState("generating");
-
-      const title =
-        mode === "pdf"
-          ? fileName.replace(/\.pdf$/i, "") || "PDF audio"
-          : pastedText.trim().slice(0, 40) || "Pasted text audio";
-
+      setError(""); setAudioUrl(""); setLoading(true); setTtsState("generating");
+      const title = mode === "pdf" ? fileName.replace(/\.pdf$/i, "") || "PDF audio" : pastedText.trim().slice(0, 40) || "Pasted text audio";
       const res = await fetch("http://localhost:4000/audio/text-to-speech", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: activeText,
-          title,
-          sourceType: mode,
-          sourceName: mode === "pdf" ? fileName : "Pasted text",
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: activeText, title, sourceType: mode, sourceName: mode === "pdf" ? fileName : "Pasted text" }),
       });
-
       let data: any = null;
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
-      }
-
-      if (!res.ok) {
-        throw new Error(data?.message || "Failed to generate audio");
-      }
-
+      try { data = await res.json(); } catch { data = null; }
+      if (!res.ok) throw new Error(data?.message || "Failed to generate audio");
       setAudioUrl(data.audioUrl);
       setTtsState("done");
     } catch (err: any) {
@@ -138,154 +76,101 @@ export default function CreateAudioPage() {
   }
 
   function resetPdf() {
-    setFileName("");
-    setExtractedText("");
-    setError("");
-    setAudioUrl("");
-    setLoading(false);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-
+    setFileName(""); setExtractedText(""); setError(""); setAudioUrl(""); setLoading(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     setTtsState(mode === "text" ? (pastedText.trim() ? "ready" : "idle") : "idle");
   }
 
-  const showControls =
-    ttsState === "ready" || ttsState === "generating" || ttsState === "done";
+  const showControls = ttsState === "ready" || ttsState === "generating" || ttsState === "done";
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-2">Create Audio</h1>
-      <p className="text-gray-400 mb-8">
-        Upload a PDF or paste text and convert it into audio.
-      </p>
+    <main style={page}>
+      <div style={card}>
+        <h1 style={title}>Create Audio</h1>
+        <p style={subtitle}>Upload a PDF or paste text and convert it into audio.</p>
 
-      <div className="flex gap-3 mb-6">
-        <button
-          type="button"
-          onClick={() => handleModeChange("pdf")}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            mode === "pdf"
-              ? "bg-blue-600 text-white"
-              : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-          }`}
-        >
-          Upload PDF
-        </button>
+        <div style={modeRow}>
+          <button type="button" onClick={() => handleModeChange("pdf")} style={{ ...modeBtn, ...(mode === "pdf" ? modeBtnActive : {}) }}>
+            Upload PDF
+          </button>
+          <button type="button" onClick={() => handleModeChange("text")} style={{ ...modeBtn, ...(mode === "text" ? modeBtnActive : {}) }}>
+            Paste Text
+          </button>
+        </div>
 
-        <button
-          type="button"
-          onClick={() => handleModeChange("text")}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            mode === "text"
-              ? "bg-blue-600 text-white"
-              : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-          }`}
-        >
-          Paste Text
-        </button>
-      </div>
-
-      {mode === "pdf" ? (
-        <div>
-          <div
-            className="border-2 border-dashed border-gray-600 rounded-xl p-10 text-center cursor-pointer hover:border-blue-500 transition-colors mb-6"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={handleFileUpload}
-            />
-            <p className="text-4xl mb-3">📄</p>
-            {fileName ? (
-              <p className="font-semibold text-blue-400">{fileName}</p>
-            ) : (
-              <>
-                <p className="font-semibold">Click to upload a PDF</p>
-                <p className="text-sm text-gray-500 mt-1">Max 20MB</p>
-              </>
+        {mode === "pdf" ? (
+          <div>
+            <div style={dropZone} onClick={() => fileInputRef.current?.click()}>
+              <input ref={fileInputRef} type="file" accept="application/pdf" style={{ display: 'none' }} onChange={handleFileUpload} />
+              <p style={{ fontSize: 32, marginBottom: 8 }}>📄</p>
+              {fileName ? (
+                <p style={{ fontWeight: 700, color: '#6E7F5B' }}>{fileName}</p>
+              ) : (
+                <>
+                  <p style={{ fontWeight: 700, color: '#6E7F5B' }}>Click to upload a PDF</p>
+                  <p style={{ fontSize: 13, color: '#8A7967', marginTop: 4 }}>Max 20MB</p>
+                </>
+              )}
+            </div>
+            {fileName && (
+              <button type="button" onClick={resetPdf} style={removBtn}>Remove PDF</button>
             )}
           </div>
-
-          {fileName && (
-            <button
-              type="button"
-              onClick={resetPdf}
-              className="mb-6 text-sm text-gray-400 hover:text-white"
-            >
-              Remove PDF
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="mb-6">
-          <label className="block text-sm text-gray-300 mb-2">
-            Paste text to read aloud
-          </label>
-          <textarea
-            value={pastedText}
-            onChange={handleTextChange}
-            placeholder="Paste your text here..."
-            rows={10}
-            className="w-full rounded-xl border border-gray-700 bg-gray-900 p-4 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <p className="text-sm text-gray-500 mt-2">
-            Paste any notes, instructions, or reading material.
-          </p>
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-red-900/40 border border-red-500 text-red-300 rounded-lg px-4 py-3 mb-6">
-          {error}
-        </div>
-      )}
-
-      {ttsState === "loading" && mode === "pdf" && (
-        <div className="text-center text-gray-400 py-4">
-          Extracting text from PDF...
-        </div>
-      )}
-
-      {showControls && (
-        <div className="bg-gray-800 rounded-xl p-6">
-          <p className="text-sm text-gray-400 mb-4 truncate">
-            Ready to convert: <span className="text-white">{readyLabel}</span>
-          </p>
-
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={generateAudio}
-              disabled={loading || !activeText}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-bold px-6 py-3 rounded-lg transition-colors"
-            >
-              {loading ? "Generating..." : "Generate Audio"}
-            </button>
+        ) : (
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>Paste text to read aloud</label>
+            <textarea value={pastedText} onChange={handleTextChange} placeholder="Paste your text here..." rows={10} style={textarea} />
+            <p style={{ fontSize: 13, color: '#8A7967', marginTop: 6 }}>Paste any notes, instructions, or reading material.</p>
           </div>
+        )}
 
-          {audioUrl && (
-            <div className="mt-6">
-              <audio controls className="w-full">
-                <source src={audioUrl} type="audio/mpeg" />
-                Your browser does not support the audio element.
-              </audio>
-            </div>
-          )}
+        {error && <div style={errorBox}>{error}</div>}
 
-          <details className="mt-4">
-            <summary className="text-sm text-gray-400 cursor-pointer hover:text-gray-200">
-              Preview text
-            </summary>
-            <p className="mt-2 text-sm text-gray-300 max-h-48 overflow-y-auto whitespace-pre-wrap bg-gray-900 rounded-lg p-3">
-              {activeText}
+        {ttsState === "loading" && mode === "pdf" && (
+          <p style={{ color: '#8A7967', textAlign: 'center', padding: '16px 0' }}>Extracting text from PDF...</p>
+        )}
+
+        {showControls && (
+          <div style={controlBox}>
+            <p style={{ fontSize: 13, color: '#8A7967', marginBottom: 16 }}>
+              Ready to convert: <span style={{ color: '#6E7F5B', fontWeight: 700 }}>{readyLabel}</span>
             </p>
-          </details>
-        </div>
-      )}
-    </div>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <button onClick={generateAudio} disabled={loading || !activeText} style={{ ...generateBtn, opacity: loading || !activeText ? 0.6 : 1 }}>
+                {loading ? "Generating..." : "Generate Audio"}
+              </button>
+            </div>
+            {audioUrl && (
+              <div style={{ marginTop: 20 }}>
+                <audio controls style={{ width: '100%' }}>
+                  <source src={audioUrl} type="audio/mpeg" />
+                </audio>
+              </div>
+            )}
+            <details style={{ marginTop: 12 }}>
+              <summary style={{ fontSize: 13, color: '#8A7967', cursor: 'pointer' }}>Preview text</summary>
+              <p style={{ marginTop: 8, fontSize: 13, color: '#6E7F5B', maxHeight: 192, overflowY: 'auto', whiteSpace: 'pre-wrap', background: '#F4F1EC', borderRadius: 10, padding: 12 }}>
+                {activeText}
+              </p>
+            </details>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
+
+const page: React.CSSProperties = { minHeight: '100vh', padding: 24, background: '#F4F1EC', color: '#6E7F5B' };
+const card: React.CSSProperties = { maxWidth: 680, margin: '0 auto' };
+const title: React.CSSProperties = { fontSize: 28, fontWeight: 900, color: '#6E7F5B', marginBottom: 6 };
+const subtitle: React.CSSProperties = { fontSize: 14, color: '#8A7967', marginBottom: 24 };
+const modeRow: React.CSSProperties = { display: 'flex', gap: 10, marginBottom: 20 };
+const modeBtn: React.CSSProperties = { padding: '9px 18px', borderRadius: 10, border: '1px solid #9CAF88', background: '#ffffff', color: '#6E7F5B', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' };
+const modeBtnActive: React.CSSProperties = { background: '#6E7F5B', color: '#ffffff', border: '1px solid #6E7F5B' };
+const dropZone: React.CSSProperties = { border: '2px dashed #9CAF88', borderRadius: 14, padding: 40, textAlign: 'center', cursor: 'pointer', background: '#ffffff', marginBottom: 12 };
+const removBtn: React.CSSProperties = { background: 'none', border: 'none', color: '#8A7967', fontSize: 13, cursor: 'pointer', marginBottom: 16, fontFamily: 'inherit' };
+const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, color: '#8A7967', marginBottom: 8 };
+const textarea: React.CSSProperties = { width: '100%', borderRadius: 12, border: '1px solid #9CAF88', background: '#ffffff', padding: 12, fontSize: 14, color: '#6E7F5B', fontFamily: 'inherit', outline: 'none', resize: 'vertical' };
+const errorBox: React.CSSProperties = { background: 'rgba(201,131,122,0.15)', border: '1px solid #c9837a', color: '#c9837a', borderRadius: 12, padding: '12px 16px', marginBottom: 16 };
+const controlBox: React.CSSProperties = { background: '#ffffff', border: '1px solid #9CAF88', borderRadius: 16, padding: 24 };
+const generateBtn: React.CSSProperties = { background: '#6E7F5B', color: '#ffffff', fontWeight: 700, fontSize: 15, padding: '12px 24px', borderRadius: 12, border: 'none', cursor: 'pointer', fontFamily: 'inherit' };
