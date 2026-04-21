@@ -1,5 +1,7 @@
+'use client';
 import Link from "next/link";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 
 const tabs = [
   { label: "Dashboard", href: "/dashboard" },
@@ -11,6 +13,13 @@ const tabs = [
 ];
 
 export default function TopNav() {
+  const [name, setName] = useState('');
+
+  useEffect(() => {
+    const stored = localStorage.getItem('name');
+    if (stored) setName(stored);
+  }, []);
+
   return (
     <header style={styles.header} aria-label="Top navigation">
       <Image
@@ -27,6 +36,7 @@ export default function TopNav() {
           </Link>
         ))}
       </nav>
+      {name && <div style={styles.greeting}>Hi, {name}</div>}
     </header>
   );
 }
@@ -52,5 +62,11 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#6E7F5B",
     border: "none",
     background: "transparent",
+  },
+  greeting: {
+    fontWeight: 700,
+    fontSize: 15,
+    color: "#8A7967",
+    whiteSpace: "nowrap",
   },
 };
