@@ -2,8 +2,10 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   Post,
   Res,
 } from '@nestjs/common';
@@ -26,6 +28,7 @@ export class AudioController {
     @Body('title') title: string,
     @Body('sourceType') sourceType: SourceType,
     @Body('sourceName') sourceName: string,
+    @Body('folderId') folderId?: number,
   ) {
     if (!text?.trim()) {
       throw new BadRequestException('Text is required');
@@ -36,6 +39,7 @@ export class AudioController {
       title: title?.trim() || 'Untitled audio',
       sourceType: sourceType || 'text',
       sourceName,
+      folderId: folderId ?? null,
       userId: this.getCurrentUserId(),
     });
 
@@ -44,6 +48,7 @@ export class AudioController {
       title: item.title,
       sourceType: item.sourceType,
       sourceName: item.sourceName,
+      folderId: item.folderId,
       createdAt: item.createdAt,
       audioUrl: `http://localhost:4000/audio/${item.id}/stream`,
     };
@@ -56,15 +61,10 @@ export class AudioController {
 
   @Get('library/:id')
   async getLibraryItem(@Param('id') id: string) {
-    console.log('Requested audio id:', id);
-    console.log('Current user id:', this.getCurrentUserId());
-
     const item = await this.audioService.getAudioById(
       Number(id),
       this.getCurrentUserId(),
     );
-
-    console.log('Fetched item:', item);
 
     if (!item) {
       throw new BadRequestException('Audio not found');
@@ -76,6 +76,7 @@ export class AudioController {
       sourceType: item.sourceType,
       sourceName: item.sourceName,
       sourceText: item.sourceText,
+      folderId: item.folderId,
       createdAt: item.createdAt,
       audioUrl: `http://localhost:4000/audio/${item.id}/stream`,
     };
@@ -83,15 +84,10 @@ export class AudioController {
 
   @Get(':id/stream')
   async streamAudio(@Param('id') id: string, @Res() res: Response) {
-    console.log('Streaming audio id:', id);
-    console.log('Current user id:', this.getCurrentUserId());
-
     const item = await this.audioService.getAudioById(
       Number(id),
       this.getCurrentUserId(),
     );
-
-    console.log('Streaming item:', item);
 
     if (!item) {
       throw new BadRequestException('Audio not found');
@@ -106,5 +102,56 @@ export class AudioController {
     });
 
     res.send(buffer);
+  }
+
+  @Post('folders')
+  async createFolder(@Body('name') name: string) {
+    return this.audioService.createFolder(this.getCurrentUserId(), name);
+  }
+
+  @Patch('folders/:id')
+  async renameFolder(
+    @Param('id') id: string,
+    @Body('name') name: string,
+  ) {
+    return this.audioService.renameFolder(
+      Number(id),
+      this.getCurrentUserId(),
+      name,
+    );
+  }
+
+  @Patch(':id/rename')
+  async renameAudio(
+    @Param('id') id: string,
+    @Body('title') title: string,
+  ) {
+    return this.audioService.renameAudio(
+      Number(id),
+      this.getCurrentUserId(),
+      title,
+    );
+  }
+
+  @Patch(':id/move')
+  async moveAudio(
+    @Param('id') id: string,
+    @Body('folderId') folderId: number | null,
+  ) {
+    return this.audioService.moveAudio(
+      Number(id),
+      this.getCurrentUserId(),
+      folderId ?? null,
+    );
+  }
+
+  @Delete(':id')
+  async deleteAudio(@Param('id') id: string) {
+    await this.audioService.deleteAudio(
+      Number(id),
+      this.getCurrentUserId(),
+    );
+
+    return { success: true };
   }
 }

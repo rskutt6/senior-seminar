@@ -14,7 +14,6 @@ type ApiAssignment = {
 };
 
 export default function CalendarPage() {
-  // TODO: replace with real logged-in user id later
   const user = getCurrentUser();
   const userId = user?.id;
 
@@ -29,10 +28,11 @@ export default function CalendarPage() {
       setError('You must be logged in.');
       return;
     }
-    
+
     async function load() {
       setLoading(true);
       setError('');
+
       try {
         const res = await fetch(
           `http://localhost:4000/assignments?userId=${userId}`,
@@ -40,7 +40,10 @@ export default function CalendarPage() {
         );
 
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.message || 'Failed to load assignments');
+
+        if (!res.ok) {
+          throw new Error(data.message || 'Failed to load assignments');
+        }
 
         setAssignments(data as ApiAssignment[]);
       } catch (e: any) {
@@ -53,50 +56,49 @@ export default function CalendarPage() {
     load();
   }, [userId]);
 
-  // Only show assignments that actually have a due date
   const dueAssignments = useMemo(
     () => assignments.filter((a) => !!a.dueAt),
     [assignments]
   );
 
-  // handles deleting assignments
   async function handleDeleteAssignment(id: number) {
-  setError('');
-  setDeletingId(id);
+    setError('');
+    setDeletingId(id);
 
-  // optimistic UI
-  const prev = assignments;
-  setAssignments((cur) => cur.filter((a) => a.id !== id));
+    const prev = assignments;
+    setAssignments((cur) => cur.filter((a) => a.id !== id));
 
-  try {
-    const res = await fetch(
-      `http://localhost:4000/assignments/${id}?userId=${userId}`,
-      { method: 'DELETE' }
-    );
+    try {
+      const res = await fetch(
+        `http://localhost:4000/assignments/${id}?userId=${userId}`,
+        { method: 'DELETE' }
+      );
 
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.message || 'Failed to delete assignment');
-  } catch (e: any) {
-    // rollback if it failed
-    setAssignments(prev);
-    setError(e.message || 'Failed to delete assignment');
-  } finally {
-    setDeletingId(null);
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to delete assignment');
+      }
+    } catch (e: any) {
+      setAssignments(prev);
+      setError(e.message || 'Failed to delete assignment');
+    } finally {
+      setDeletingId(null);
+    }
   }
-}
 
   return (
-    <main style={{ maxWidth: 1100, margin: '0 auto' }}>
-      <h1 style={{ margin: 0, fontSize: 28, fontWeight: 900 }}>Calendar</h1>
-      <p style={{ opacity: 0.8, marginTop: 6 }}>
+    <main className="mx-auto w-full max-w-[1280px] px-8">
+      <h1 className="m-0 text-[32px] font-black">Calendar</h1>
+      <p className="mt-2 text-base opacity-80">
         Assignment due dates (click a day).
       </p>
 
-      {loading && <p>Loading…</p>}
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      {loading && <p className="mt-4">Loading…</p>}
+      {error && <p className="mt-4 text-red-700">{error}</p>}
 
       {!loading && !error && (
-        <MonthCalendar 
+        <MonthCalendar
           assignments={dueAssignments}
           onDelete={handleDeleteAssignment}
           deletingId={deletingId}
