@@ -105,6 +105,11 @@ function parseChecklistItems(raw: Assignment["checklistItems"]): EditableCheckli
   }
 }
 
+function shouldRegenerateDates(items: EditableChecklistItem[]) {
+  // if ANY item already has a custom date (user edited), don’t override
+  return items.every((item) => !item.dueDate || item.dueDate.length === 10);
+}
+
 function normalizeSummary(raw: unknown): SummarySections | null {
   if (!raw) return null;
 
@@ -254,6 +259,69 @@ export default function AssignmentDetailPage() {
 
     load();
   }, [id, userId]);
+
+useEffect(() => {
+  if (!hasLoadedRef.current) return;
+  if (!dueAt) return;
+
+  setChecklistItems((prev) => {
+    if (!prev.length) return prev;
+
+    const newDates = generateFallbackDates(prev.length, dueAt);
+
+    let changed = false;
+
+    const updated = prev.map((item, i) => {
+      const nextDate = newDates[i] || item.dueDate;
+
+      // only update if different (prevents infinite loop)
+      if (item.dueDate !== nextDate) {
+        changed = true;
+        return { ...item, dueDate: nextDate };
+      }
+
+      return item;
+    });
+
+    return changed ? updated : prev;
+  });
+}, [dueAt]);
+
+function generateFallbackDates(count: number, dueAtLocal: string) {
+  if (!count) return [];
+
+  const now = new Date();
+  const due = new Date(dueAtLocal);
+
+  const totalDays = Math.max(
+    1,
+    Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  );
+
+  return Array.from({ length: count }, (_, i) => {
+    const ratio = count === 1 ? 1 : i / (count - 1);
+    const offset = Math.floor(ratio * totalDays);
+
+    const d = new Date(now);
+    d.setDate(now.getDate() + offset);
+
+    return d.toISOString().slice(0, 10);
+  });
+}
+
+function regenerateChecklistDates(
+  items: EditableChecklistItem[],
+  dueAtLocal: string
+) {
+  if (!items.length || !dueAtLocal) return items;
+
+  const newDates = generateFallbackDates(items.length, dueAtLocal);
+
+  return items.map((item, i) => ({
+    ...item,
+    dueDate: newDates[i] || item.dueDate,
+  }));
+}
 
   const totalMinutes = useMemo(() => {
     return checklistItems.reduce((sum, item) => sum + (Number(item.minutes) || 0), 0);
