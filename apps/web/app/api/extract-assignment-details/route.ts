@@ -46,7 +46,7 @@ Return ONLY valid JSON:
 {
   "title": "string | null",
   "courseName": "string | null",
-  "dueAt": "string | null",
+  "dueAt": "ISO 8601 date string with year (YYYY-MM-DDTHH:mm:ss.sssZ) or null",
   "weight": number | null,
   "assignmentType": "string",
   "problemCount": number | null,
@@ -64,21 +64,15 @@ Return ONLY valid JSON:
 }
 
 Rules:
+- dueAt MUST include a year (use current year if missing)
+- If date is like "May 6" → convert to "2026-05-06T23:59:00.000Z"
+- If no time is given → default to 11:59 PM
+- NEVER return a past year
 - assignmentType MUST be one of:
-homework, essay, reading, project, discussion, exam, quiz, lab, presentation, other
-
+  homework, essay, reading, project, discussion, exam, quiz, lab, presentation, other
 - If unsure → default to "homework"
-
-- priority:
-  high = urgent/heavy
-  medium = normal
-  low = small
-
+- priority: high, medium, low
 - status ALWAYS = "not_started"
-
-- summary fields: 1–2 SHORT sentences each
-
-- detect pageCount and problemCount if present
 
 Text:
 ${description}`
@@ -89,17 +83,16 @@ ${description}`
 
     let dueAt: string | null = null;
 
-    if (typeof parsed.dueAt === "string" && parsed.dueAt.trim()) {
+if (typeof parsed.dueAt === "string" && parsed.dueAt.trim()) {
+  const d = new Date(parsed.dueAt);
 
-      const d = new Date(parsed.dueAt);
+  if (!Number.isNaN(d.getTime())) {
+    // 🔥 FORCE LOCAL 11:59 PM
+    d.setHours(23, 59, 0, 0);
 
-      if (!Number.isNaN(d.getTime())) {
-
-        dueAt = d.toISOString();
-
-      }
-
-    }
+    dueAt = d.toISOString();
+  }
+}
     return NextResponse.json({
       title:
         typeof parsed.title === "string" && parsed.title.trim()
