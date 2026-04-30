@@ -5,105 +5,148 @@ import MonthCalendar from './_components/MonthCalendar';
 import { getCurrentUser } from '@/lib/auth';
 
 type ApiAssignment = {
-  id: number;
-  description: string;
-  dueAt: string | null;
-  weight: number | null;
-  userId: number;
-  courseId: number | null;
+  id: number;
+  title: string;
+  description: string;
+  dueAt: string | null;
+  weight: number | null;
+  userId: number;
+  courseId: number | null;
 };
 
 export default function CalendarPage() {
-  const user = getCurrentUser();
-  const userId = user?.id;
+  const user = getCurrentUser();
+  const userId = user?.id;
 
-  const [assignments, setAssignments] = useState<ApiAssignment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [assignments, setAssignments] = useState<ApiAssignment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!userId) {
-      setLoading(false);
-      setError('You must be logged in.');
-      return;
-    }
+  // 🔥 MODAL STATE
+  const [showModal, setShowModal] = useState(false);
+  const [newEvent, setNewEvent] = useState({
+    title: '',
+    date: '',
+    time: '',
+    notes: '',
+  });
 
-    async function load() {
-      setLoading(true);
-      setError('');
+  // 🔥 LOAD DATA
+  useEffect(() => {
+    if (!userId) return;
 
-      try {
-        const res = await fetch(
-          `http://localhost:4000/assignments?userId=${userId}`,
-          { cache: 'no-store' }
-        );
+    async function load() {
+      setLoading(true);
+      setError('');
 
-        const data = await res.json().catch(() => ({}));
+      try {
+        const [aRes] = await Promise.all([
+          fetch(`http://localhost:4000/assignments?userId=${userId}`, { cache: 'no-store' }),
+        ]);
 
-        if (!res.ok) {
-          throw new Error(data.message || 'Failed to load assignments');
-        }
+        const aData = await aRes.json().catch(() => []);
 
-        setAssignments(data as ApiAssignment[]);
-      } catch (e: any) {
-        setError(e.message || 'Failed to load assignments');
-      } finally {
-        setLoading(false);
-      }
-    }
+        if (!aRes.ok) throw new Error('Assignments failed');
 
-    load();
-  }, [userId]);
+        setAssignments(aData);
+        
+      } catch (e: any) {
+        setError(e.message || 'Failed to load');
+      } finally {
+        setLoading(false);
+      }
+    }
 
-  const dueAssignments = useMemo(
-    () => assignments.filter((a) => !!a.dueAt),
-    [assignments]
-  );
+    load();
+  }, [userId]);
 
-  async function handleDeleteAssignment(id: number) {
-    setError('');
-    setDeletingId(id);
+  const dueAssignments = useMemo(
+    () => assignments.filter((a) => !!a.dueAt),
+    [assignments]
+  );
 
-    const prev = assignments;
-    setAssignments((cur) => cur.filter((a) => a.id !== id));
 
-    try {
-      const res = await fetch(
-        `http://localhost:4000/assignments/${id}?userId=${userId}`,
-        { method: 'DELETE' }
-      );
+  async function handleMoveAssignment(id: number, newDate: string) {
+    try {
+      setAssignments((prev) =>
+        prev.map((a) =>
+          a.id === id ? { ...a, dueAt: newDate } : a
+        )
+      );
 
-      const data = await res.json().catch(() => ({}));
+      await fetch(
+        `http://localhost:4000/assignments/${id}?userId=${userId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dueAt: newDate }),
+        }
+      );
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
-      if (!res.ok) {
-        throw new Error(data.message || 'Failed to delete assignment');
-      }
-    } catch (e: any) {
-      setAssignments(prev);
-      setError(e.message || 'Failed to delete assignment');
-    } finally {
-      setDeletingId(null);
-    }
-  }
+  async function handleCreateEvent() {
+  if (!newEvent.title || !newEvent.date) {
+    alert("Title and date required");
+    return;
+  }
 
-  return (
-    <main className="mx-auto w-full max-w-[1280px] px-8">
-      <h1 className="m-0 text-[32px] font-black">Calendar</h1>
-      <p className="mt-2 text-base opacity-80">
-        Assignment due dates (click a day).
-      </p>
+  const safeDate = new Date(
+    newEvent.date + (newEvent.time ? `T${newEvent.time}:00` : "T12:00:00")
+  ).toISOString();
 
-      {loading && <p className="mt-4">Loading…</p>}
-      {error && <p className="mt-4 text-red-700">{error}</p>}
+  try {
+    const res = await fetch(
+      `http://localhost:4000/events?userId=${userId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
 
-      {!loading && !error && (
-        <MonthCalendar
-          assignments={dueAssignments}
-          onDelete={handleDeleteAssignment}
-          deletingId={deletingId}
-        />
-      )}
-    </main>
-  );
+        body: JSON.stringify({
+  title: newEvent.title,
+  date: safeDate,
+  time: newEvent.time || null,
+  notes: newEvent.notes || null,
+}),
+      }
+    );
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("BACKEND ERROR:", text);
+      throw new Error("failed");
+    }
+
+    setShowModal(false);
+    location.reload();
+
+  } catch (err) {
+    console.error(err);
+    alert("Still broken — check terminal");
+  }
+}
+
+  return (
+    <main className="mx-auto w-full max-w-[1280px] px-8">
+      <h1 className="text-[32px] font-black">Calendar</h1>
+
+
+      <p className="mt-2 opacity-80">
+        Assignment due dates (click a day).
+      </p>
+
+      {loading && <p className="mt-4">Loading…</p>}
+      {error && <p className="mt-4 text-red-700">{error}</p>}
+
+      {!loading && !error && (
+        <MonthCalendar
+          assignments={dueAssignments}
+          onMoveAssignment={handleMoveAssignment}
+        />
+      )}
+
+    </main>
+  );
 }

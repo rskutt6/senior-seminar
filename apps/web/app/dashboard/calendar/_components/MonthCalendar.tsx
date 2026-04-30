@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 
 type Assignment = {
   id: number;
+  title: string;
   description: string;
   dueAt: string | null;
   weight: number | null;
@@ -11,10 +12,10 @@ type Assignment = {
   courseId: number | null;
 };
 
+
 type Props = {
   assignments: Assignment[];
-  onDelete: (id: number) => void;
-  deletingId: number | null;
+  onMoveAssignment: (id: number, newDate: string) => void;
 };
 
 function pad2(n: number) {
@@ -51,8 +52,7 @@ function isSameDay(a: Date, b: Date) {
 
 export default function MonthCalendar({
   assignments,
-  onDelete,
-  deletingId,
+  onMoveAssignment,
 }: Props) {
   const [viewDate, setViewDate] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -214,13 +214,30 @@ export default function MonthCalendar({
               }).format(day);
 
               return (
-                <button
+                <div
                   key={key}
-                  type="button"
+                  data-date={key}
+                  tabIndex={0}
                   role="gridcell"
                   aria-label={label}
                   aria-selected={isSelected}
                   onClick={() => setSelectedDay(day)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+
+                    const id = Number(e.dataTransfer.getData("assignmentId"));
+                    if (!id) return;
+
+                    // 🔥 get the correct cell even if child was hit
+                    const target = (e.target as HTMLElement).closest("[data-date]") as HTMLElement;
+                    if (!target) return;
+
+                    const newDate = target.getAttribute("data-date");
+                    if (!newDate) return;
+
+                    onMoveAssignment(id, newDate);
+                  }}
                   className={[
                     'p-3 text-left',
                     'flex flex-col gap-1 overflow-hidden',
@@ -244,27 +261,31 @@ export default function MonthCalendar({
                       />
                     )}
                   </div>
+                  <div className="mt-2 flex flex-col gap-1 overflow-hidden">
 
-                  {hasDue && (
-                    <div className="mt-2 flex-1 space-y-1 overflow-hidden">
-                      {dayAssignments.slice(0, 3).map((a) => (
-                        <div
-                          key={a.id}
-                          title={a.description}
-                          className="truncate rounded-full border border-black/10 bg-black/[0.02] px-2 py-1 text-xs leading-snug"
-                        >
-                          {a.description}
-                        </div>
-                      ))}
+                    {dayAssignments.slice(0, 3).map((a) => (
+                      <a
+                        key={a.id}
+                        href={`/dashboard/assignments/${a.id}`}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("assignmentId", String(a.id));
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="truncate rounded-md border border-black/10 bg-black/[0.02] px-2 py-1 text-xs hover:underline cursor-grab active:cursor-grabbing"
+                      >
+                        {a.title || "Untitled"}
+                      </a>
+                    ))}
 
-                      {dayAssignments.length > 3 && (
-                        <div className="text-xs opacity-70">
-                          +{dayAssignments.length - 3} more
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </button>
+                    {dayAssignments.length > 3 && (
+                      <div className="text-xs opacity-70">
+                        +{dayAssignments.length - 3} more
+                      </div>
+                    )}
+
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -277,10 +298,10 @@ export default function MonthCalendar({
           <h3 className="m-0 text-lg font-black">
             {selectedDay
               ? new Intl.DateTimeFormat(undefined, {
-                  weekday: 'long',
-                  month: 'long',
-                  day: 'numeric',
-                }).format(selectedDay)
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+              }).format(selectedDay)
               : 'Select a day'}
           </h3>
 
@@ -296,51 +317,38 @@ export default function MonthCalendar({
             </p>
           )}
 
-          {selectedDay && selectedAssignments.length > 0 && (
+          {selectedDay && (selectedAssignments.length > 0) && (
             <ul className="mt-4 flex flex-col gap-3 p-0">
+
+              {/* 🟩 ASSIGNMENTS */}
               {selectedAssignments.map((a) => {
                 const time = a.dueAt
                   ? new Intl.DateTimeFormat(undefined, {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    }).format(new Date(a.dueAt))
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  }).format(new Date(a.dueAt))
                   : null;
 
-                const isDeleting = deletingId === a.id;
+
 
                 return (
                   <li
                     key={a.id}
                     className="list-none rounded-2xl border border-black/10 bg-black/[0.02] p-4"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex flex-col gap-1">
-                        <div className="text-sm font-black">
-                          {a.description}
-                        </div>
+                    <div className="flex flex-col gap-1">
 
-                        <div className="text-xs opacity-75">
-                          {time ? <span>Due {time}</span> : <span>No due time</span>}
-                          {typeof a.weight === 'number' ? (
-                            <span> • Weight {a.weight}%</span>
-                          ) : null}
-                          {a.courseId ? <span> • Course #{a.courseId}</span> : null}
-                        </div>
+                      <a
+                        href={`/dashboard/assignments/${a.id}`}
+                        className="text-sm font-black hover:underline"
+                      >
+                        {a.title || 'Untitled'}
+                      </a>
+
+                      <div className="text-xs opacity-75">
+                        {time ? <span>Due {time}</span> : <span>No due time</span>}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => onDelete(a.id)}
-                        disabled={isDeleting}
-                        aria-label={`Delete assignment: ${a.description}`}
-                        className={
-                          isDeleting
-                            ? 'rounded-xl border border-black/10 bg-black/5 px-3 py-2 text-xs font-extrabold text-black/45 cursor-not-allowed'
-                            : 'rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-extrabold text-red-700 hover:bg-red-500/15'
-                        }
-                      >
-                        {isDeleting ? 'Deleting…' : 'Delete'}
-                      </button>
                     </div>
                   </li>
                 );
