@@ -39,8 +39,8 @@ export async function POST(req: Request) {
     }
 
     const response = await openai.responses.create({
-  model: "gpt-4o-mini",
-  input: `Extract assignment details.
+      model: "gpt-4o-mini",
+      input: `Extract assignment details.
 
 Return ONLY valid JSON:
 {
@@ -82,11 +82,24 @@ homework, essay, reading, project, discussion, exam, quiz, lab, presentation, ot
 
 Text:
 ${description}`
-});
+    });
 
     const raw = response.output_text?.trim() || "";
     const parsed = JSON.parse(extractJsonObject(raw));
 
+    let dueAt: string | null = null;
+
+    if (typeof parsed.dueAt === "string" && parsed.dueAt.trim()) {
+
+      const d = new Date(parsed.dueAt);
+
+      if (!Number.isNaN(d.getTime())) {
+
+        dueAt = d.toISOString();
+
+      }
+
+    }
     return NextResponse.json({
       title:
         typeof parsed.title === "string" && parsed.title.trim()
@@ -96,10 +109,7 @@ ${description}`
         typeof parsed.courseName === "string" && parsed.courseName.trim()
           ? parsed.courseName.trim()
           : null,
-      dueAt:
-        typeof parsed.dueAt === "string" && parsed.dueAt.trim()
-          ? parsed.dueAt.trim()
-          : null,
+      dueAt: dueAt,
       weight:
         typeof parsed.weight === "number" && Number.isFinite(parsed.weight)
           ? parsed.weight
@@ -135,6 +145,7 @@ ${description}`
     });
   } catch (e) {
     console.error(e);
+
     return NextResponse.json({ error: "failed" }, { status: 500 });
   }
 }

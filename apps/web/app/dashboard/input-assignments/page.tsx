@@ -43,8 +43,8 @@ type Course = {
 };
 
 const ASSIGNMENT_TYPES = [
-  "homework","essay","reading","project","discussion",
-  "exam","quiz","lab","presentation","other",
+  "homework", "essay", "reading", "project", "discussion",
+  "exam", "quiz", "lab", "presentation", "other",
 ] as const;
 
 export default function InputAssignmentsPage() {
@@ -115,8 +115,15 @@ export default function InputAssignmentsPage() {
       };
       if (typeof extracted.weight === "number" && Number.isFinite(extracted.weight)) body.weight = extracted.weight;
       if (typeof extracted.dueAt === "string" && extracted.dueAt.trim()) {
-        const parsedDate = new Date(extracted.dueAt);
-        if (!Number.isNaN(parsedDate.getTime())) body.dueAt = parsedDate.toISOString();
+        if (typeof extracted.dueAt === "string" && extracted.dueAt.trim()) {
+          const parsedDate = new Date(extracted.dueAt);
+
+          if (!Number.isNaN(parsedDate.getTime())) {
+            body.dueAt = parsedDate.toISOString();
+          } else {
+            console.log("❌ INVALID DATE FROM AI:", extracted.dueAt);
+          }
+        }
       }
       const res = await fetch("http://localhost:4000/assignments", {
         method: "POST",

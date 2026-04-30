@@ -43,7 +43,13 @@ ${description}`,
 
     const text = response.output_text;
 
-    const parsed = JSON.parse(text);
+const jsonMatch = text.match(/\{[\s\S]*\}/);
+
+if (!jsonMatch) {
+  throw new Error("No JSON found in response");
+}
+
+const parsed = JSON.parse(jsonMatch[0]);
 
     return Response.json({
       overview: parsed.overview,
@@ -56,7 +62,8 @@ ${description}`,
         priorityScore: item.priorityScore ?? 50,
       })),
     });
-  } catch (err) {
-    return new Response("Failed", { status: 500 });
-  }
+  } catch (err: any) {
+  console.error("CHECKLIST ERROR:", err);
+  return new Response(err.message || "Failed", { status: 500 });
+}
 }
