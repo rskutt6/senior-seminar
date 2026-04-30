@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 
 type Assignment = {
   id: number;
+  title: string;
   description: string;
   dueAt: string | null;
   weight: number | null;
@@ -11,10 +12,10 @@ type Assignment = {
   courseId: number | null;
 };
 
+
 type Props = {
   assignments: Assignment[];
-  onDelete: (id: number) => void;
-  deletingId: number | null;
+  onMoveAssignment: (id: number, newDate: string) => void;
 };
 
 function pad2(n: number) {
@@ -22,7 +23,9 @@ function pad2(n: number) {
 }
 
 function toLocalDateKey(date: Date) {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(
+    date.getDate()
+  )}`;
 }
 
 function startOfMonth(d: Date) {
@@ -47,14 +50,19 @@ function isSameDay(a: Date, b: Date) {
   );
 }
 
-export default function MonthCalendar({ assignments, onDelete, deletingId }: Props) {
+export default function MonthCalendar({
+  assignments,
+  onMoveAssignment,
+}: Props) {
   const [viewDate, setViewDate] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
   const byDay = useMemo(() => {
     const map = new Map<string, Assignment[]>();
+
     for (const a of assignments) {
       if (!a.dueAt) continue;
+
       const due = new Date(a.dueAt);
       if (Number.isNaN(due.getTime())) continue;
 
@@ -71,6 +79,7 @@ export default function MonthCalendar({ assignments, onDelete, deletingId }: Pro
         if (tx !== ty) return tx - ty;
         return x.id - y.id;
       });
+
       map.set(k, list);
     }
 
@@ -78,15 +87,18 @@ export default function MonthCalendar({ assignments, onDelete, deletingId }: Pro
   }, [assignments]);
 
   const monthStart = useMemo(() => startOfMonth(viewDate), [viewDate]);
-  const monthEnd = useMemo(() => endOfMonth(viewDate), [viewDate]); // (kept if you use later)
+  const monthEnd = useMemo(() => endOfMonth(viewDate), [viewDate]);
 
   const gridDays = useMemo(() => {
     const start = new Date(monthStart);
-    const dayOfWeek = start.getDay(); // 0=Sun
+    const dayOfWeek = start.getDay();
     const gridStart = addDays(start, -dayOfWeek);
 
     const days: Date[] = [];
-    for (let i = 0; i < 42; i++) days.push(addDays(gridStart, i));
+    for (let i = 0; i < 42; i++) {
+      days.push(addDays(gridStart, i));
+    }
+
     return days;
   }, [monthStart]);
 
@@ -94,7 +106,11 @@ export default function MonthCalendar({ assignments, onDelete, deletingId }: Pro
   const selectedAssignments = selectedKey ? byDay.get(selectedKey) ?? [] : [];
 
   const monthLabel = useMemo(() => {
-    const fmt = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
+    const fmt = new Intl.DateTimeFormat(undefined, {
+      month: 'long',
+      year: 'numeric',
+    });
+
     return fmt.format(viewDate);
   }, [viewDate]);
 
@@ -115,18 +131,19 @@ export default function MonthCalendar({ assignments, onDelete, deletingId }: Pro
   }
 
   return (
-    <div className="mt-4">
-      {/* Header */}
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex flex-col gap-2">
-          <h2 className="m-0 text-[22px] font-black tracking-[-0.2px]">{monthLabel}</h2>
+    <div className="mt-6">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-3">
+          <h2 className="m-0 text-[26px] font-black tracking-[-0.2px]">
+            {monthLabel}
+          </h2>
 
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={goPrevMonth}
               aria-label="Previous month"
-              className="rounded-xl border border-black/10 bg-white px-3 py-2 font-bold shadow-sm hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="rounded-xl border border-black/10 bg-white px-4 py-3 font-bold shadow-sm hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
               ←
             </button>
@@ -135,7 +152,7 @@ export default function MonthCalendar({ assignments, onDelete, deletingId }: Pro
               type="button"
               onClick={goNextMonth}
               aria-label="Next month"
-              className="rounded-xl border border-black/10 bg-white px-3 py-2 font-bold shadow-sm hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="rounded-xl border border-black/10 bg-white px-4 py-3 font-bold shadow-sm hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
               →
             </button>
@@ -143,7 +160,7 @@ export default function MonthCalendar({ assignments, onDelete, deletingId }: Pro
             <button
               type="button"
               onClick={goToday}
-              className="rounded-xl border border-black/10 bg-white px-3 py-2 font-bold shadow-sm hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="rounded-xl border border-black/10 bg-white px-4 py-3 font-bold shadow-sm hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
               Today
             </button>
@@ -156,34 +173,38 @@ export default function MonthCalendar({ assignments, onDelete, deletingId }: Pro
         </div>
       </div>
 
-      {/* Calendar + side panel */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-start">
-        {/* Calendar card */}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2.2fr)_minmax(320px,0.8fr)] xl:items-start">
         <section
           aria-label="Month calendar"
           className="overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)]"
         >
-          {/* DOW header */}
-          <div aria-hidden="true" className="grid grid-cols-7 border-b border-black/10 bg-black/[0.02]">
+          <div
+            aria-hidden="true"
+            className="grid grid-cols-7 border-b border-black/10 bg-black/[0.02]"
+          >
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-              <div key={d} className="px-3 py-2 text-xs font-extrabold opacity-75">
+              <div
+                key={d}
+                className="px-4 py-3 text-sm font-extrabold opacity-75"
+              >
                 {d}
               </div>
             ))}
           </div>
 
-          {/* Fixed-height grid */}
           <div
             role="grid"
             aria-label="Calendar days"
-            className="grid grid-cols-7 auto-rows-[112px] divide-x divide-y divide-black/10"
+            className="grid grid-cols-7 auto-rows-[140px] divide-x divide-y divide-black/10"
           >
             {gridDays.map((day) => {
               const inMonth = day.getMonth() === monthStart.getMonth();
               const key = toLocalDateKey(day);
               const dayAssignments = byDay.get(key) ?? [];
               const hasDue = dayAssignments.length > 0;
-              const isSelected = selectedDay ? isSameDay(day, selectedDay) : false;
+              const isSelected = selectedDay
+                ? isSameDay(day, selectedDay)
+                : false;
 
               const label = new Intl.DateTimeFormat(undefined, {
                 weekday: 'long',
@@ -193,115 +214,141 @@ export default function MonthCalendar({ assignments, onDelete, deletingId }: Pro
               }).format(day);
 
               return (
-                <button
+                <div
                   key={key}
-                  type="button"
+                  data-date={key}
+                  tabIndex={0}
                   role="gridcell"
                   aria-label={label}
                   aria-selected={isSelected}
                   onClick={() => setSelectedDay(day)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+
+                    const id = Number(e.dataTransfer.getData("assignmentId"));
+                    if (!id) return;
+
+                    // 🔥 get the correct cell even if child was hit
+                    const target = (e.target as HTMLElement).closest("[data-date]") as HTMLElement;
+                    if (!target) return;
+
+                    const newDate = target.getAttribute("data-date");
+                    if (!newDate) return;
+
+                    onMoveAssignment(id, newDate);
+                  }}
                   className={[
-                    'p-2 text-left',
-                    'flex flex-col gap-1 overflow-hidden', // prevents growth
+                    'p-3 text-left',
+                    'flex flex-col gap-1 overflow-hidden',
                     'bg-white hover:bg-zinc-50',
                     'focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
                     !inMonth ? 'bg-black/[0.02] opacity-70' : '',
-                    isSelected ? 'bg-blue-50 shadow-[inset_0_0_0_2px_rgba(37,99,235,0.55)]' : '',
+                    isSelected
+                      ? 'bg-blue-50 shadow-[inset_0_0_0_2px_rgba(37,99,235,0.55)]'
+                      : '',
                   ].join(' ')}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-black">{day.getDate()}</span>
-                    {hasDue && <span className="h-2.5 w-2.5 rounded-full bg-blue-600" aria-label="Has due dates" />}
+                    <span className="text-base font-black">
+                      {day.getDate()}
+                    </span>
+
+                    {hasDue && (
+                      <span
+                        className="h-2.5 w-2.5 rounded-full bg-blue-600"
+                        aria-label="Has due dates"
+                      />
+                    )}
                   </div>
+                  <div className="mt-2 flex flex-col gap-1 overflow-hidden">
 
-                  {/* Preview (bounded) */}
-                  {hasDue && (
-                    <div className="mt-1 flex-1 space-y-1 overflow-hidden">
-                      {dayAssignments.slice(0, 2).map((a) => (
-                        <div
-                          key={a.id}
-                          title={a.description}
-                          className="truncate rounded-full border border-black/10 bg-black/[0.02] px-2 py-1 text-xs leading-snug"
-                        >
-                          {a.description}
-                        </div>
-                      ))}
+                    {dayAssignments.slice(0, 3).map((a) => (
+                      <a
+                        key={a.id}
+                        href={`/dashboard/assignments/${a.id}`}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("assignmentId", String(a.id));
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="truncate rounded-md border border-black/10 bg-black/[0.02] px-2 py-1 text-xs hover:underline cursor-grab active:cursor-grabbing"
+                      >
+                        {a.title || "Untitled"}
+                      </a>
+                    ))}
 
-                      {dayAssignments.length > 2 && (
-                        <div className="text-xs opacity-70">+{dayAssignments.length - 2} more</div>
-                      )}
-                    </div>
-                  )}
-                </button>
+                    {dayAssignments.length > 3 && (
+                      <div className="text-xs opacity-70">
+                        +{dayAssignments.length - 3} more
+                      </div>
+                    )}
+
+                  </div>
+                </div>
               );
             })}
           </div>
         </section>
 
-        {/* Side panel */}
         <aside
           aria-label="Selected day details"
-          className="rounded-2xl border border-black/10 bg-white p-4 shadow-[0_10px_30px_rgba(0,0,0,0.08)]"
+          className="rounded-2xl border border-black/10 bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.08)]"
         >
-          <h3 className="m-0 text-base font-black">
-            {selectedDay ? (
-              new Intl.DateTimeFormat(undefined, {
+          <h3 className="m-0 text-lg font-black">
+            {selectedDay
+              ? new Intl.DateTimeFormat(undefined, {
                 weekday: 'long',
                 month: 'long',
                 day: 'numeric',
               }).format(selectedDay)
-            ) : (
-              'Select a day'
-            )}
+              : 'Select a day'}
           </h3>
 
           {!selectedDay && (
-            <p className="mt-2 text-sm opacity-75">Click a date to see assignments due that day.</p>
+            <p className="mt-2 text-sm opacity-75">
+              Click a date to see assignments due that day.
+            </p>
           )}
 
           {selectedDay && selectedAssignments.length === 0 && (
-            <p className="mt-2 text-sm opacity-75">No assignments due on this day.</p>
+            <p className="mt-2 text-sm opacity-75">
+              No assignments due on this day.
+            </p>
           )}
 
-          {selectedDay && selectedAssignments.length > 0 && (
-            <ul className="mt-3 flex flex-col gap-2 p-0">
+          {selectedDay && (selectedAssignments.length > 0) && (
+            <ul className="mt-4 flex flex-col gap-3 p-0">
+
+              {/* 🟩 ASSIGNMENTS */}
               {selectedAssignments.map((a) => {
                 const time = a.dueAt
-                  ? new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(
-                      new Date(a.dueAt)
-                    )
+                  ? new Intl.DateTimeFormat(undefined, {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  }).format(new Date(a.dueAt))
                   : null;
 
-                const isDeleting = deletingId === a.id;
+
 
                 return (
                   <li
                     key={a.id}
-                    className="list-none rounded-2xl border border-black/10 bg-black/[0.02] p-3"
+                    className="list-none rounded-2xl border border-black/10 bg-black/[0.02] p-4"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex flex-col gap-1">
-                        <div className="text-sm font-black">{a.description}</div>
-                        <div className="text-xs opacity-75">
-                          {time ? <span>Due {time}</span> : <span>No due time</span>}
-                          {typeof a.weight === 'number' ? <span> • Weight {a.weight}%</span> : null}
-                          {a.courseId ? <span> • Course #{a.courseId}</span> : null}
-                        </div>
+                    <div className="flex flex-col gap-1">
+
+                      <a
+                        href={`/dashboard/assignments/${a.id}`}
+                        className="text-sm font-black hover:underline"
+                      >
+                        {a.title || 'Untitled'}
+                      </a>
+
+                      <div className="text-xs opacity-75">
+                        {time ? <span>Due {time}</span> : <span>No due time</span>}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => onDelete(a.id)}
-                        disabled={isDeleting}
-                        aria-label={`Delete assignment: ${a.description}`}
-                        className={
-                          isDeleting
-                            ? 'rounded-xl border border-black/10 bg-black/5 px-3 py-2 text-xs font-extrabold text-black/45 cursor-not-allowed'
-                            : 'rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-extrabold text-red-700 hover:bg-red-500/15'
-                        }
-                      >
-                        {isDeleting ? 'Deleting…' : 'Delete'}
-                      </button>
                     </div>
                   </li>
                 );
