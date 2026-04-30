@@ -2,7 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 const tabs = [
   { label: "Dashboard", href: "/dashboard" },
@@ -15,7 +15,6 @@ const tabs = [
 export default function TopNav() {
   const [name, setName] = useState('');
   const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(() => {
     const stored = localStorage.getItem('name');
@@ -46,19 +45,11 @@ export default function TopNav() {
         style={{ objectFit: "contain" }}
       />
       <nav style={styles.row}>
-        {tabs.map((t) => {
-          const isActive = pathname === t.href;
-          return (
-            <Link key={t.href} href={t.href} style={{
-              ...styles.tab,
-              color: isActive ? '#6E7F5B' : '#8A7967',
-              borderBottom: isActive ? '2px solid #9CAF88' : '2px solid transparent',
-              paddingBottom: 4,
-            }}>
-              {t.label}
-            </Link>
-          );
-        })}
+        {tabs.map((t) => (
+          <Link key={t.href} href={t.href} style={styles.tab}>
+            {t.label}
+          </Link>
+        ))}
         <button onClick={handleLogout} style={styles.tab}>
           Logout →
         </button>
@@ -87,14 +78,12 @@ const styles: Record<string, React.CSSProperties> = {
     textDecoration: "none",
     fontWeight: 700,
     fontSize: 18,
-    color: "#8A7967",
+    color: "#6E7F5B",
     border: "none",
     background: "transparent",
     cursor: "pointer",
     fontFamily: "inherit",
     padding: 0,
-    paddingBottom: 4,
-    borderBottom: '2px solid transparent',
   },
   greeting: {
     fontWeight: 700,
