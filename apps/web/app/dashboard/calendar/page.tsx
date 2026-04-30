@@ -49,6 +49,7 @@ export default function CalendarPage() {
         if (!aRes.ok) throw new Error('Assignments failed');
 
         setAssignments(aData);
+console.log("ALL ASSIGNMENTS:", aData);
         
       } catch (e: any) {
         setError(e.message || 'Failed to load');
@@ -60,10 +61,14 @@ export default function CalendarPage() {
     load();
   }, [userId]);
 
-  const dueAssignments = useMemo(
-    () => assignments.filter((a) => !!a.dueAt),
-    [assignments]
-  );
+  const dueAssignments = useMemo(() => {
+  return assignments.filter((a) => {
+    if (!a.dueAt) return false;
+
+    const d = new Date(a.dueAt);
+    return !Number.isNaN(d.getTime());
+  });
+}, [assignments]);
 
 
   async function handleMoveAssignment(id: number, newDate: string) {
@@ -146,6 +151,7 @@ export default function CalendarPage() {
           onMoveAssignment={handleMoveAssignment}
         />
       )}
+
 
     </main>
   );

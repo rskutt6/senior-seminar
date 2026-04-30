@@ -14,7 +14,7 @@ export async function POST(req: Request) {
 
     const response = await openai.responses.create({
       model: "gpt-4o-mini",
-      input: `Generate a checklist for this assignment.
+      input: `Generate a detailed, actionable checklist for this assignment.
 
 Return ONLY valid JSON:
 {
@@ -29,13 +29,21 @@ Return ONLY valid JSON:
 }
 
 Rules:
+- Each step must be SPECIFIC and ACTIONABLE (no vague steps like "work on assignment")
+- Break large tasks into smaller steps (5–10 steps total)
+- Include concrete actions like:
+  - "Review lecture slides for chapters 1–3"
+  - "Take notes on key concepts from chapter 4"
+  - "Create outline with intro, 3 body sections, conclusion"
+- Vary step types (reading, notes, planning, writing, reviewing)
+- Include at least one "review" or "final check" step at the end
+- minutes should be realistic (30–120 per step)
 - priorityScore: 1–100 (higher = more important)
 - prioritize:
   - exams/projects > essays > homework
   - closer deadlines
   - dependency order
 - distribute scores (not all 100)
-- steps must be actionable
 
 Text:
 ${description}`,
@@ -43,7 +51,13 @@ ${description}`,
 
     const text = response.output_text;
 
-    const parsed = JSON.parse(text);
+const jsonMatch = text.match(/\{[\s\S]*\}/);
+
+if (!jsonMatch) {
+  throw new Error("No JSON found in response");
+}
+
+const parsed = JSON.parse(jsonMatch[0]);
 
     return Response.json({
       overview: parsed.overview,
@@ -56,7 +70,8 @@ ${description}`,
         priorityScore: item.priorityScore ?? 50,
       })),
     });
-  } catch (err) {
-    return new Response("Failed", { status: 500 });
-  }
+  } catch (err: any) {
+  console.error("CHECKLIST ERROR:", err);
+  return new Response(err.message || "Failed", { status: 500 });
+}
 }

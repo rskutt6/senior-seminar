@@ -39,14 +39,14 @@ export async function POST(req: Request) {
     }
 
     const response = await openai.responses.create({
-  model: "gpt-4o-mini",
-  input: `Extract assignment details.
+      model: "gpt-4o-mini",
+      input: `Extract assignment details.
 
 Return ONLY valid JSON:
 {
   "title": "string | null",
   "courseName": "string | null",
-  "dueAt": "string | null",
+  "dueAt": "ISO 8601 date string with year (YYYY-MM-DDTHH:mm:ss.sssZ) or null",
   "weight": number | null,
   "assignmentType": "string",
   "problemCount": number | null,
@@ -64,29 +64,35 @@ Return ONLY valid JSON:
 }
 
 Rules:
+- dueAt MUST include a year (use current year if missing)
+- If date is like "May 6" → convert to "2026-05-06T23:59:00.000Z"
+- If no time is given → default to 11:59 PM
+- NEVER return a past year
 - assignmentType MUST be one of:
-homework, essay, reading, project, discussion, exam, quiz, lab, presentation, other
-
+  homework, essay, reading, project, discussion, exam, quiz, lab, presentation, other
 - If unsure → default to "homework"
-
-- priority:
-  high = urgent/heavy
-  medium = normal
-  low = small
-
+- priority: high, medium, low
 - status ALWAYS = "not_started"
-
-- summary fields: 1–2 SHORT sentences each
-
-- detect pageCount and problemCount if present
 
 Text:
 ${description}`
-});
+    });
 
     const raw = response.output_text?.trim() || "";
     const parsed = JSON.parse(extractJsonObject(raw));
 
+    let dueAt: string | null = null;
+
+if (typeof parsed.dueAt === "string" && parsed.dueAt.trim()) {
+  const d = new Date(parsed.dueAt);
+
+  if (!Number.isNaN(d.getTime())) {
+    // 🔥 FORCE LOCAL 11:59 PM
+    d.setHours(23, 59, 0, 0);
+
+    dueAt = d.toISOString();
+  }
+}
     return NextResponse.json({
       title:
         typeof parsed.title === "string" && parsed.title.trim()
@@ -96,10 +102,7 @@ ${description}`
         typeof parsed.courseName === "string" && parsed.courseName.trim()
           ? parsed.courseName.trim()
           : null,
-      dueAt:
-        typeof parsed.dueAt === "string" && parsed.dueAt.trim()
-          ? parsed.dueAt.trim()
-          : null,
+      dueAt: dueAt,
       weight:
         typeof parsed.weight === "number" && Number.isFinite(parsed.weight)
           ? parsed.weight
@@ -135,6 +138,7 @@ ${description}`
     });
   } catch (e) {
     console.error(e);
+
     return NextResponse.json({ error: "failed" }, { status: 500 });
   }
 }
