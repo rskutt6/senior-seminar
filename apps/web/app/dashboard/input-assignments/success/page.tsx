@@ -121,15 +121,14 @@ function RequiredLabel({
 }
 
 function toLocalDateTimeInputValue(value: string | null) {
-  if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
+  if (!value) return "";
 
-  const pad = (n: number) => String(n).padStart(2, "0");
+  const [datePart] = value.split("T");
 
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
-    d.getDate()
-  )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if (!datePart) return "";
+
+  // 🔥 FORCE END OF DAY
+  return `${datePart}T23:59`;
 }
 
 function parseChecklistItems(raw: Assignment["checklistItems"]): EditableChecklistItem[] {
@@ -170,7 +169,7 @@ function generateFallbackDates(count: number, dueAtLocal: string) {
     const offset = Math.max(0, Math.floor(ratio * totalDays));
     const d = new Date(now);
     d.setDate(now.getDate() + offset);
-    return d.toISOString().slice(0, 10);
+    return d.toISOString();
   });
 }
 
@@ -589,7 +588,7 @@ export default function InputAssignmentSuccessPage() {
         description: description.trim(),
         courseId: selectedCourseId.trim() ? Number(selectedCourseId) : null,
         weight: weight.trim() ? Number(weight) : null,
-        dueAt: dueAtLocal.trim() ? new Date(dueAtLocal).toISOString() : null,
+        dueAt: dueAtLocal ? `${dueAtLocal}:00` : null,
 
         assignmentType: assignmentType.trim() || null,
         priority: priority.trim() || null,

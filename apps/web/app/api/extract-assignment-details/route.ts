@@ -63,6 +63,21 @@ Return ONLY valid JSON:
   }
 }
 
+CRITICAL RULES:
+
+- If a due date EXISTS in the text → YOU MUST USE IT EXACTLY
+- DO NOT invent or guess a date if one is clearly written
+- Parse formats like:
+  - "May 19, 2026"
+  - "May 19"
+  - "5/19/2026"
+- If year is missing → use current year
+- If time is missing → use 23:59
+- Only fallback to a default (7 days from today) IF NO DATE EXISTS AT ALL
+
+- NEVER return a past date
+- Convert final result to ISO format
+
 Rules:
 - dueAt MUST include a year (use current year if missing)
 - If date is like "May 6" → convert to "2026-05-06T23:59:00.000Z"
@@ -81,18 +96,28 @@ ${description}`
     const raw = response.output_text?.trim() || "";
     const parsed = JSON.parse(extractJsonObject(raw));
 
-    let dueAt: string | null = null;
+    let dueAt = null;
 
-if (typeof parsed.dueAt === "string" && parsed.dueAt.trim()) {
+if (parsed.dueAt) {
   const d = new Date(parsed.dueAt);
 
-  if (!Number.isNaN(d.getTime())) {
-    // 🔥 FORCE LOCAL 11:59 PM
-    d.setHours(23, 59, 0, 0);
-
-    dueAt = d.toISOString();
-  }
+  dueAt = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+
+// fallback ONLY if missing
+if (!dueAt) {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+
+  dueAt = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+return Response.json({
+  title: parsed.title,
+  courseName: parsed.courseName,
+  dueAt,
+});
+
     return NextResponse.json({
       title:
         typeof parsed.title === "string" && parsed.title.trim()
