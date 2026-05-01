@@ -86,6 +86,7 @@ export default function AssignmentDetailPage() {
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const prevDue = useRef<string | null>(null);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -130,6 +131,42 @@ export default function AssignmentDetailPage() {
 
     load();
   }, [id, userId]);
+
+  useEffect(() => {
+  if (!hasLoadedRef.current) return;
+  if (!dueAt) return;
+  if (!checklistItems.length) return;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const newDue = new Date(dueAt);
+  newDue.setHours(0, 0, 0, 0);
+
+  if (Number.isNaN(newDue.getTime())) return;
+
+  setChecklistItems((prev) =>
+    prev.map((item, i) => {
+      const d = new Date(newDue);
+
+      // Spread items backwards from due date,
+      // but NEVER before today.
+      d.setDate(newDue.getDate() - Math.floor((prev.length - 1 - i) / 2));
+
+      if (d < today) {
+        return {
+          ...item,
+          dueDate: today.toISOString().slice(0, 10),
+        };
+      }
+
+      return {
+        ...item,
+        dueDate: d.toISOString().slice(0, 10),
+      };
+    })
+  );
+}, [dueAt]);
 
   /* AUTOSAVE */
   useEffect(() => {
