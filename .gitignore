@@ -14,3 +14,5 @@ dist
 
 # macOS junk
 .DS_Store
+
+.idea/
