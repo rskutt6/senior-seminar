@@ -24,25 +24,27 @@ Focus Flow is a full-stack assignment management application that allows users t
 ## 📁 Repository Structure
 
 This project uses a **monorepo architecture**, where both frontend and backend live in the same repository and are managed using npm workspaces.
+## 📁 Repository Structure
+
+This project uses a **monorepo architecture**, where both frontend and backend live in the same repository and are managed using npm workspaces.
 
 root/
 │
 ├── apps/
-│   ├── web/                # Frontend (Next.js)
-│   │   ├── app/            # Pages (App Router)
-│   │   ├── components/     # UI components
-│   │   └── lib/            # Utility/helper functions
-│   │
-│   └── api/                # Backend (NestJS)
-│       ├── src/
-│       │   ├── main.ts     # Backend entry point
-│       │   ├── modules/    # Feature modules
-│       │   └── services/   # Business logic
+│ ├── web/ # Frontend (Next.js)
+│ │ ├── app/ # Pages (App Router)
+│ │ ├── components/ # UI components
+│ │ └── lib/ # Utility/helper functions
+│ │
+│ └── api/ # Backend (NestJS)
+│ ├── src/
+│ │ ├── main.ts # Backend entry point
+│ │ ├── modules/ # Feature modules
+│ │ └── services/ # Business logic
 │
-├── package.json            # Root scripts (runs both apps)
+├── package.json # Root scripts (runs both apps)
 ├── package-lock.json
 └── README.md
-
 ---
 
 ## Entry Points
